@@ -3,6 +3,11 @@ run-name: Deploy Azure demo · ${{ inputs.onboarding_id || github.run_number }}
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: GitHub environment holding this deployment's settings
+        type: environment
+        required: true
+        default: zavaclaims
       onboarding_id:
         description: Optional correlation ID supplied by the onboarding command
         type: string
@@ -15,12 +20,12 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: deploy-azure-demo
+  group: deploy-${{ inputs.environment || 'azure-demo' }}
   cancel-in-progress: false
 jobs:
   validate:
     runs-on: ubuntu-latest
-    environment: azure-demo
+    environment: ${{ inputs.environment || 'azure-demo' }}
     env:
       AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
@@ -34,6 +39,8 @@ jobs:
       AZURE_POSTGRES_SKU: ${{ vars.AZURE_POSTGRES_SKU || 'Standard_B1ms' }}
       AZURE_POSTGRES_TIER: ${{ vars.AZURE_POSTGRES_TIER || 'Burstable' }}
       AZURE_POSTGRES_SERVER_NAME: ${{ vars.AZURE_POSTGRES_SERVER_NAME }}
+      AZURE_REGISTRY_NAME: ${{ vars.AZURE_REGISTRY_NAME }}
+      AZURE_WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}
       ENTRA_API_CLIENT_ID: ${{ vars.ENTRA_API_CLIENT_ID }}
       ENTRA_SPA_CLIENT_ID: ${{ vars.ENTRA_SPA_CLIENT_ID }}
       ENTRA_ALLOWED_CLIENT_IDS: ${{ vars.ENTRA_ALLOWED_CLIENT_IDS }}
@@ -77,7 +84,7 @@ jobs:
     if: ${{ !inputs.dry_run }}
     needs: validate
     runs-on: ubuntu-latest
-    environment: azure-demo
+    environment: ${{ inputs.environment || 'azure-demo' }}
     permissions:
       contents: read
       id-token: write
@@ -94,6 +101,8 @@ jobs:
       AZURE_POSTGRES_SKU: ${{ vars.AZURE_POSTGRES_SKU || 'Standard_B1ms' }}
       AZURE_POSTGRES_TIER: ${{ vars.AZURE_POSTGRES_TIER || 'Burstable' }}
       AZURE_POSTGRES_SERVER_NAME: ${{ vars.AZURE_POSTGRES_SERVER_NAME }}
+      AZURE_REGISTRY_NAME: ${{ vars.AZURE_REGISTRY_NAME }}
+      AZURE_WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}
       ENTRA_API_CLIENT_ID: ${{ vars.ENTRA_API_CLIENT_ID }}
       ENTRA_SPA_CLIENT_ID: ${{ vars.ENTRA_SPA_CLIENT_ID }}
       ENTRA_ALLOWED_CLIENT_IDS: ${{ vars.ENTRA_ALLOWED_CLIENT_IDS }}

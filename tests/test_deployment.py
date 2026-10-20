@@ -212,3 +212,20 @@ def test_separate_web_region_preserves_database_location():
     container_env = dict(env, AZURE_HOSTING="containerapps")
     assert "appServiceLocation" not in parameters(container_env)["parameters"]
     assert parameters(container_env, fixture_outputs())["parameters"]["location"]["value"] == "eastus"
+
+
+def test_explicit_clean_resource_names_keep_their_template_contracts():
+    env = dict(runtime_config("appservice"), AZURE_LOCATION="centralus", AZURE_APPSERVICE_LOCATION="centralus",
+               AZURE_REGISTRY_NAME="zavaclaimsacr", AZURE_WEBAPP_NAME="zavaclaims-portal",
+               AZURE_POSTGRES_SERVER_NAME="zavaclaims-pg")
+    foundation = parameters(env)
+    app = parameters(env, fixture_outputs())
+    assert foundation["parameters"]["registryName"]["value"] == "zavaclaimsacr"
+    assert app["parameters"]["webAppName"]["value"] == "zavaclaims-portal"
+    assert foundation["parameters"]["location"] == app["parameters"]["location"] == {"value": "centralus"}
+    for name, document in (("foundation", foundation), ("app-service", app)):
+        template = ROOT / f"work/templates/{name}.json"
+        if template.exists():
+            check_contract(document, json.loads(template.read_text()))
+    assert validate(dict(config(), AZURE_REGISTRY_NAME="bad-name"))
+    assert validate(dict(config(), AZURE_WEBAPP_NAME="bad_name"))

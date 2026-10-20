@@ -17,9 +17,9 @@ param databaseSku string = 'Standard_B1ms'
 param databaseTier string = 'Burstable'
 @description('Stable PostgreSQL server name. Override only for a deliberately new database.')
 param databaseServerName string = '${prefix}-${uniqueString(resourceGroup().id)}-pg'
+@description('Optional explicit globally unique registry name. Keep stable after deployment.')
+param registryName string = '${prefix}${uniqueString(resourceGroup().id)}'
 
-var suffix = uniqueString(resourceGroup().id)
-var registryName = '${prefix}${suffix}'
 var separateWebRegion = hosting == 'appservice' && appServiceLocation != location
 
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
@@ -46,7 +46,7 @@ resource network 'Microsoft.Network/virtualNetworks@2023-11-01' = {
   location: location
   properties: {
     addressSpace: { addressPrefixes: ['10.72.0.0/16'] }
-    subnets: [
+    subnets: concat(hosting == 'containerapps' ? [
       {
         name: 'containers'
         properties: {
@@ -54,6 +54,7 @@ resource network 'Microsoft.Network/virtualNetworks@2023-11-01' = {
           delegations: [{ name: 'containerapps', properties: { serviceName: 'Microsoft.App/environments' } }]
         }
       }
+    ] : [], [
       {
         name: 'database'
         properties: {
@@ -61,6 +62,7 @@ resource network 'Microsoft.Network/virtualNetworks@2023-11-01' = {
           delegations: [{ name: 'postgresql', properties: { serviceName: 'Microsoft.DBforPostgreSQL/flexibleServers' } }]
         }
       }
+    ], hosting == 'appservice' ? [
       {
         name: 'web'
         properties: {
@@ -68,7 +70,7 @@ resource network 'Microsoft.Network/virtualNetworks@2023-11-01' = {
           delegations: [{ name: 'appservice', properties: { serviceName: 'Microsoft.Web/serverFarms' } }]
         }
       }
-    ]
+    ] : [])
   }
 }
 resource dns 'Microsoft.Network/privateDnsZones@2020-06-01' = {

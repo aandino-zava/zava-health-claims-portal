@@ -3,6 +3,11 @@ run-name: OIDC discovery · ${{ inputs.request_id }}
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: GitHub environment to discover and trust
+        type: environment
+        required: true
+        default: zavaclaims
       request_id:
         description: Correlation ID supplied by the onboarding command
         required: true
@@ -12,7 +17,7 @@ permissions:
 jobs:
   discover:
     runs-on: ubuntu-latest
-    environment: azure-demo
+    environment: ${{ inputs.environment || 'azure-demo' }}
     permissions:
       contents: read
       id-token: write

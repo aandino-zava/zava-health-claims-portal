@@ -22,7 +22,7 @@ def validate(env):
     for key in (*GUID_KEYS, "AZURE_RESOURCE_GROUP", "AZURE_PREFIX",
                 "ENTRA_ALLOWED_CLIENT_IDS", "DATABASE_ADMIN_PASSWORD", "DATABASE_APP_PASSWORD"):
         if not env.get(key, "").strip():
-            errors.append(f"{key}: set a nonempty value in the azure-demo environment.")
+            errors.append(f"{key}: set a nonempty value in the selected GitHub environment.")
     for key in GUID_KEYS:
         if env.get(key) and not valid_guid(env[key]):
             errors.append(f"{key}: use a nonzero lowercase GUID in canonical hyphenated format.")
@@ -44,6 +44,10 @@ def validate(env):
         errors.append("AZURE_LOCATION: use a region code such as eastus, not a display name.")
     if env.get("AZURE_APPSERVICE_LOCATION") and not re.fullmatch(r"[a-z][a-z0-9]+", env["AZURE_APPSERVICE_LOCATION"]):
         errors.append("AZURE_APPSERVICE_LOCATION: use a region code such as centralus.")
+    if env.get("AZURE_REGISTRY_NAME") and not re.fullmatch(r"[a-z0-9]{5,50}", env["AZURE_REGISTRY_NAME"]):
+        errors.append("AZURE_REGISTRY_NAME: use 5-50 lowercase letters or digits.")
+    if env.get("AZURE_WEBAPP_NAME") and not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,58}[a-z0-9]", env["AZURE_WEBAPP_NAME"]):
+        errors.append("AZURE_WEBAPP_NAME: use 2-60 lowercase letters/digits/hyphens, with alphanumeric ends.")
     group = env.get("AZURE_RESOURCE_GROUP", "")
     if group and (group != group.strip() or len(group) > 90 or group.endswith(".")
                   or not all(c.isalnum() or c in "_-.()" for c in group)):

@@ -21,6 +21,8 @@ def parameters(env, outputs=None):
         params["databaseTier"] = env.get("AZURE_POSTGRES_TIER", "Burstable")
         if env.get("AZURE_POSTGRES_SERVER_NAME"):
             params["databaseServerName"] = env["AZURE_POSTGRES_SERVER_NAME"]
+        if env.get("AZURE_REGISTRY_NAME"):
+            params["registryName"] = env["AZURE_REGISTRY_NAME"]
     else:
         keys = (("identityId", "databaseHost", "webSubnetId", "logsWorkspaceId") if hosting == "appservice"
                 else ("environmentId", "identityId", "registryServer", "databaseHost"))
@@ -29,6 +31,8 @@ def parameters(env, outputs=None):
         if hosting == "appservice":
             params["appServiceSku"] = env.get("AZURE_APPSERVICE_SKU", "B1")
             params["location"] = env.get("AZURE_APPSERVICE_LOCATION") or params["location"]
+            if env.get("AZURE_WEBAPP_NAME"):
+                params["webAppName"] = env["AZURE_WEBAPP_NAME"]
         params.update(
             appDatabasePassword=env["DATABASE_APP_PASSWORD"],
             seedDemo=env.get("SEED_DEMO", "true").lower() == "true",

@@ -196,3 +196,17 @@ def test_app_service_capacity_override():
     assert parameters(env, fixture_outputs())["parameters"]["appServiceSku"]["value"] == "P0v3"
     assert validate(dict(config(), AZURE_APPSERVICE_SKU="P0v3")) == []
     assert validate(dict(config(), AZURE_APPSERVICE_SKU="invalid"))
+
+
+def test_separate_web_region_preserves_database_location():
+    env = dict(runtime_config("appservice"), AZURE_APPSERVICE_LOCATION="centralus")
+    foundation = parameters(env)["parameters"]
+    app = parameters(env, fixture_outputs())["parameters"]
+    assert foundation["location"]["value"] == "eastus"
+    assert foundation["appServiceLocation"]["value"] == "centralus"
+    assert app["location"]["value"] == "centralus"
+    check_contract(parameters(env), json.loads((ROOT / "work/templates/foundation.json").read_text()))
+    assert validate(dict(config(), AZURE_APPSERVICE_LOCATION="Central US"))
+    container_env = dict(env, AZURE_HOSTING="containerapps")
+    assert "appServiceLocation" not in parameters(container_env)["parameters"]
+    assert parameters(container_env, fixture_outputs())["parameters"]["location"]["value"] == "eastus"

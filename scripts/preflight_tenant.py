@@ -42,6 +42,8 @@ def validate(env):
         errors.append("AZURE_POSTGRES_SERVER_NAME: use 3-63 lowercase letters/digits/hyphens, with alphanumeric ends.")
     if not re.fullmatch(r"[a-z][a-z0-9]+", env.get("AZURE_LOCATION", "eastus")):
         errors.append("AZURE_LOCATION: use a region code such as eastus, not a display name.")
+    if env.get("AZURE_APPSERVICE_LOCATION") and not re.fullmatch(r"[a-z][a-z0-9]+", env["AZURE_APPSERVICE_LOCATION"]):
+        errors.append("AZURE_APPSERVICE_LOCATION: use a region code such as centralus.")
     group = env.get("AZURE_RESOURCE_GROUP", "")
     if group and (group != group.strip() or len(group) > 90 or group.endswith(".")
                   or not all(c.isalnum() or c in "_-.()" for c in group)):

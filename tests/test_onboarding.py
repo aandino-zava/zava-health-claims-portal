@@ -145,3 +145,20 @@ def test_readiness_checks_selected_database_size_instead_of_default(monkeypatch)
     onboarding.azure_readiness("eastus2", "appservice", "Standard_B2s", "Burstable")
     with pytest.raises(RuntimeError, match="Standard_B1ms"):
         onboarding.azure_readiness("eastus2", "appservice")
+
+
+def test_arm_plan_preflight_uses_metadata_only_and_requested_size(monkeypatch):
+    import json
+    from pathlib import Path
+
+    def azure(*args, **kwargs):
+        assert args[:4] == ("az", "deployment", "group", "validate")
+        template = json.loads(Path(args[args.index("--template-file") + 1]).read_text())
+        assert "parameters" not in template
+        plan = template["resources"][0]
+        assert plan["name"] == "claims-plan"
+        assert plan["sku"] == {"name": "P0v3", "tier": "PremiumV3", "capacity": 1}
+        assert kwargs["public_errors"] is True
+
+    monkeypatch.setattr(onboarding, "run", azure)
+    onboarding.validate_appservice_plan("eastus2", "P0v3", "demo-rg", "claims")

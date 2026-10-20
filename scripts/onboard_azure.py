@@ -21,9 +21,10 @@ CONTRIBUTOR = "b24988ac-6180-42a0-ab88-20f7382dd24c"
 RBAC_ADMIN = "f58310d9-a9f6-439a-9e8d-f62e7b41a168"
 ACR_PULL = "7f951dda-4ed3-4680-a7ca-43fe172d538d"
 STATE = Path("work/onboarding-state.json")
+APPSERVICE_SKUS = ("B1", "B2", "B3", "S1", "S2", "S3", "P0v3", "P1v3", "P2v3", "P3v3")
 
 
-def run(*args, body=None, raw=False):
+def run(*args, body=None, raw=False, public_errors=False):
     """Use stdin for GitHub JSON/secrets; never echo command arguments or input."""
     executable = shutil.which(args[0])
     if not executable:
@@ -40,6 +41,9 @@ def run(*args, body=None, raw=False):
                             capture_output=True, text=True, encoding="utf-8")
     if result.returncode:
         # CLI errors can contain submitted bodies: surface the operation, not its input.
+        if public_errors:
+            # Opt in only for operations whose complete input contains no credentials.
+            raise RuntimeError(result.stderr.strip() or "Public configuration validation failed.")
         raise RuntimeError(f"{args[0]} {' '.join(args[1:3])} failed (exit {result.returncode}). "
                            "Check account privileges and the corresponding service operation.")
     if raw:
@@ -225,6 +229,27 @@ def azure_readiness(location, hosting, database_sku="Standard_B1ms", database_ti
     print(f"Azure advertises PostgreSQL 16 / {database_sku} in {location}; no checked blocker found.", flush=True)
 
 
+def validate_appservice_plan(location, sku, resource_group, prefix):
+    if sku not in APPSERVICE_SKUS:
+        raise RuntimeError("Unsupported App Service size; check AZURE_APPSERVICE_SKU.")
+    tier = "Basic" if sku.startswith("B") else "Standard" if sku.startswith("S") else "PremiumV3"
+    template = {"$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                "contentVersion": "1.0.0.0", "resources": [{
+                    "type": "Microsoft.Web/serverfarms", "apiVersion": "2023-12-01",
+                    "name": prefix + "-plan", "location": location, "kind": "linux",
+                    "sku": {"name": sku, "tier": tier, "capacity": 1}, "properties": {"reserved": True},
+                }]}
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "plan.json"
+        path.write_text(json.dumps(template), encoding="utf-8")
+        # ARM provider validation catches per-SKU VM quotas the summary endpoint can omit.
+        # This template has no secrets and provisions no resources; RG Contributor is sufficient.
+        run("az", "deployment", "group", "validate", "--resource-group", resource_group,
+            "--name", "claims-plan-preflight", "--template-file", str(path), "--output", "none",
+            public_errors=True)
+    print(f"App Service {sku} passed ARM plan validation in {location}.", flush=True)
+
+
 def workflow(repo, filename, title_prefix, inputs, timeout=7200):
     request_id = str(uuid4())
     key = "request_id" if filename == "oidc.yml" else "onboarding_id"
@@ -303,6 +328,7 @@ def main():
     parser.add_argument("--database-sku", help="PostgreSQL SKU; defaults to the environment setting or Standard_B1ms")
     parser.add_argument("--database-tier", choices=("Burstable", "GeneralPurpose", "MemoryOptimized"))
     parser.add_argument("--database-server-name", help="Explicit name for a deliberately new PostgreSQL server")
+    parser.add_argument("--appservice-sku", choices=APPSERVICE_SKUS)
     parser.add_argument("--employee", help="Employee object ID; defaults to the signed-in administrator")
     parser.add_argument("--deploy", action="store_true", help="Validate, deploy billable resources, and set redirect")
     parser.add_argument("--finalize", action="store_true", help="Set redirect from the existing claims-app deployment")
@@ -346,12 +372,15 @@ def main():
     database_sku = args.database_sku or current.get("AZURE_POSTGRES_SKU", "Standard_B1ms")
     database_tier = args.database_tier or current.get("AZURE_POSTGRES_TIER", "Burstable")
     database_name = args.database_server_name or current.get("AZURE_POSTGRES_SERVER_NAME")
+    appservice_sku = args.appservice_sku or current.get("AZURE_APPSERVICE_SKU", "B1")
     if database_name and not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", database_name):
         raise RuntimeError("Invalid PostgreSQL server name.")
     if not re.fullmatch(r"Standard_[A-Za-z0-9_]+", database_sku):
         raise RuntimeError("Invalid PostgreSQL SKU name.")
     if args.deploy:
         azure_readiness(args.location, args.hosting, database_sku, database_tier)
+        if args.hosting == "appservice":
+            validate_appservice_plan(args.location, appservice_sku, args.resource_group, args.prefix)
     for key, expected in {"AZURE_TENANT_ID": args.tenant, "AZURE_SUBSCRIPTION_ID": args.subscription,
                           "AZURE_PREFIX": args.prefix, "AZURE_HOSTING": args.hosting,
                           "AZURE_RESOURCE_GROUP": args.resource_group}.items():
@@ -376,6 +405,7 @@ def main():
                  "AZURE_DEPLOY_CLIENT_ID": deploy["appId"], "AZURE_RESOURCE_GROUP": args.resource_group,
                  "AZURE_LOCATION": args.location, "AZURE_HOSTING": args.hosting, "AZURE_PREFIX": args.prefix,
                  "AZURE_POSTGRES_SKU": database_sku, "AZURE_POSTGRES_TIER": database_tier,
+                 "AZURE_APPSERVICE_SKU": appservice_sku,
                  "ENTRA_API_CLIENT_ID": api["appId"], "ENTRA_SPA_CLIENT_ID": spa["appId"],
                  "ENTRA_ALLOWED_CLIENT_IDS": spa["appId"], "SEED_DEMO": "true"}
     if database_name:

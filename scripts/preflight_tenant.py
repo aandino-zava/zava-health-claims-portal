@@ -30,6 +30,8 @@ def validate(env):
         errors.append("AZURE_PREFIX: use 3-16 lowercase letters/digits, starting with a letter.")
     if env.get("AZURE_HOSTING", "containerapps") not in {"containerapps", "appservice"}:
         errors.append("AZURE_HOSTING: choose containerapps or appservice.")
+    if env.get("AZURE_APPSERVICE_SKU", "B1") not in {"B1", "B2", "B3", "S1", "S2", "S3", "P0v3", "P1v3", "P2v3", "P3v3"}:
+        errors.append("AZURE_APPSERVICE_SKU: choose a supported Basic, Standard, or Premium v3 size.")
     if not re.fullmatch(r"Standard_[A-Za-z0-9_]+", env.get("AZURE_POSTGRES_SKU", "Standard_B1ms")):
         errors.append("AZURE_POSTGRES_SKU: use an Azure PostgreSQL SKU name such as Standard_B2s.")
     if env.get("AZURE_POSTGRES_TIER", "Burstable") not in {"Burstable", "GeneralPurpose", "MemoryOptimized"}:

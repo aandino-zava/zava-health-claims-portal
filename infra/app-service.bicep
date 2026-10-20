@@ -17,6 +17,10 @@ param allowedClientIds string
 param webSubnetId string
 param logsWorkspaceId string
 param seedDemo bool = true
+@allowed(['B1', 'B2', 'B3', 'S1', 'S2', 'S3', 'P0v3', 'P1v3', 'P2v3', 'P3v3'])
+param appServiceSku string = 'B1'
+
+var appServiceTier = startsWith(appServiceSku, 'B') ? 'Basic' : (startsWith(appServiceSku, 'S') ? 'Standard' : 'PremiumV3')
 
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: last(split(identityId, '/'))
@@ -25,7 +29,7 @@ resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: '${prefix}-plan'
   location: location
   kind: 'linux'
-  sku: { name: 'B1', tier: 'Basic', capacity: 1 }
+  sku: { name: appServiceSku, tier: appServiceTier, capacity: 1 }
   properties: { reserved: true }
 }
 resource app 'Microsoft.Web/sites@2023-12-01' = {

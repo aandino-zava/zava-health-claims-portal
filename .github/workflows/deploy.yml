@@ -100,6 +100,9 @@ jobs:
           client-id: ${{ vars.AZURE_DEPLOY_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Check live Azure service availability
+        if: ${{ !inputs.dry_run }}
+        run: python -m scripts.preflight_azure
       - name: Build parameter files without logging secrets
         if: ${{ !inputs.dry_run }}
         run: python scripts/deployment_parameters.py

@@ -89,3 +89,27 @@ def test_run_does_not_log_sensitive_cli_errors(monkeypatch):
     with pytest.raises(RuntimeError) as error:
         onboarding.run("gh", "secret", "set", "PASSWORD", body="secret body")
     assert "secret body" not in str(error.value)
+
+
+def test_live_preflight_stops_on_regional_restriction_and_pending_feature(monkeypatch):
+    def azure(*args):
+        if args[1] == "postgres":
+            return [{"supportedServerVersions": [], "reason": "Provisioning is restricted in this region."}]
+        return {"properties": {"state": "Pending"}}
+
+    monkeypatch.setattr(onboarding, "run", azure)
+    with pytest.raises(RuntimeError) as error:
+        onboarding.azure_readiness("eastus", "containerapps")
+    assert "Provisioning is restricted" in str(error.value)
+    assert "Pending approval" in str(error.value)
+
+
+def test_app_service_preflight_does_not_require_container_network_feature(monkeypatch):
+    def azure(*args):
+        assert args[1] == "postgres"
+        return [{"supportedServerVersions": [{"name": "16"}], "supportedServerEditions": [
+            {"name": "Burstable", "supportedServerSkus": [{"name": "Standard_B1ms"}]},
+        ]}]
+
+    monkeypatch.setattr(onboarding, "run", azure)
+    onboarding.azure_readiness("eastus2", "appservice")

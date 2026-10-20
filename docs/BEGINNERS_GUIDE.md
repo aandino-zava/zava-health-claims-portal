@@ -31,7 +31,7 @@ The **API** is the set of requests another program can send. Both the browser an
 
 Local mode supplies Reader, Writer, and Reviewer automatically. In Azure, Entra identifies the caller and the API checks the token and roles. Roles are independent; Reviewer does not include Reader. Keep development authentication on your computer.
 
-The working Azure demo uses App Service in Central US and private PostgreSQL in East US 2. [Automated onboarding](DEPLOYMENT.md#automated-onboarding) handles identities, GitHub settings, deployment, and the redirect URL after administrator sign-in.
+The working Azure demo keeps App Service, private PostgreSQL, and the other regional services together in Central US. [Automated onboarding](DEPLOYMENT.md#automated-onboarding) handles identities, GitHub settings, deployment, and the redirect URL after administrator sign-in.
 
 ## Find the part you want to change
 

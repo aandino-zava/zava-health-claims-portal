@@ -25,6 +25,8 @@ Omit `--deploy` to configure onboarding and run validation only. This still crea
 
 If Azure rejects the default database size with `SkuNotAvailable`, select an available size explicitly, for example `--database-sku Standard_B2s --database-tier Burstable`. The command saves these values as GitHub environment variables and reuses them on subsequent runs. Changing database size changes Azure costs. Capability discovery reports what Azure advertises; actual provisioning can still reject a listed size because of capacity or subscription restrictions.
 
+Failed server creation can leave a name reserved after its ARM resource disappears. For an empty environment only, use `--database-server-name <fresh-unique-name>` to deliberately create a new server. The name is saved for later releases. Changing this setting in a populated environment creates a different database; it does not migrate existing claims. Keep the selected name stable once data is stored.
+
 The command:
 
 - Creates or reuses three single-tenant registrations named `<prefix>-claims-api`, `<prefix>-claims-spa`, and `<prefix>-github-deploy`. It configures v2 API tokens, `Claims.Access`, and the three claim roles; grants SPA consent; and assigns Reader, Writer, and Reviewer to the signed-in administrator (or the object ID supplied with `--employee`).
@@ -67,6 +69,7 @@ Create a GitHub environment named `azure-demo`. If you restrict deployment branc
 | AZURE_PREFIX | Unique deployment prefix, e.g. `claimsdev` |
 | AZURE_POSTGRES_SKU | Optional database size; default `Standard_B1ms`, e.g. `Standard_B2s` where B1ms is unavailable |
 | AZURE_POSTGRES_TIER | Optional `Burstable` (default), `GeneralPurpose`, or `MemoryOptimized`; must match the size |
+| AZURE_POSTGRES_SERVER_NAME | Optional explicit PostgreSQL server name; keep stable after data is stored |
 | ENTRA_API_CLIENT_ID | API registration client GUID |
 | ENTRA_SPA_CLIENT_ID | Browser registration client GUID |
 | ENTRA_ALLOWED_CLIENT_IDS | SPA and approved agent client GUIDs, comma-separated |

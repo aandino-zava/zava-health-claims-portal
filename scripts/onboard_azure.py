@@ -302,6 +302,7 @@ def main():
     parser.add_argument("--hosting", choices=("containerapps", "appservice"), default="containerapps")
     parser.add_argument("--database-sku", help="PostgreSQL SKU; defaults to the environment setting or Standard_B1ms")
     parser.add_argument("--database-tier", choices=("Burstable", "GeneralPurpose", "MemoryOptimized"))
+    parser.add_argument("--database-server-name", help="Explicit name for a deliberately new PostgreSQL server")
     parser.add_argument("--employee", help="Employee object ID; defaults to the signed-in administrator")
     parser.add_argument("--deploy", action="store_true", help="Validate, deploy billable resources, and set redirect")
     parser.add_argument("--finalize", action="store_true", help="Set redirect from the existing claims-app deployment")
@@ -344,6 +345,9 @@ def main():
     current = {item["name"]: item["value"] for item in gh(variables_path + "?per_page=100")["variables"]}
     database_sku = args.database_sku or current.get("AZURE_POSTGRES_SKU", "Standard_B1ms")
     database_tier = args.database_tier or current.get("AZURE_POSTGRES_TIER", "Burstable")
+    database_name = args.database_server_name or current.get("AZURE_POSTGRES_SERVER_NAME")
+    if database_name and not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", database_name):
+        raise RuntimeError("Invalid PostgreSQL server name.")
     if not re.fullmatch(r"Standard_[A-Za-z0-9_]+", database_sku):
         raise RuntimeError("Invalid PostgreSQL SKU name.")
     if args.deploy:
@@ -374,6 +378,8 @@ def main():
                  "AZURE_POSTGRES_SKU": database_sku, "AZURE_POSTGRES_TIER": database_tier,
                  "ENTRA_API_CLIENT_ID": api["appId"], "ENTRA_SPA_CLIENT_ID": spa["appId"],
                  "ENTRA_ALLOWED_CLIENT_IDS": spa["appId"], "SEED_DEMO": "true"}
+    if database_name:
+        variables["AZURE_POSTGRES_SERVER_NAME"] = database_name
     current = gh(environment_path + "/variables?per_page=100")["variables"]
     current = {item["name"]: item["value"] for item in current}
     # Preserve explicitly approved agent clients and the operator's seed preference on reruns.

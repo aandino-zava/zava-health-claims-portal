@@ -52,6 +52,39 @@ def test_rejects_mismatched_federation_context(key, value):
         onboarding.validate_claims(dict(claims(), **{key: value}), repo())
 
 
+def test_selected_environment_cannot_reuse_another_environments_subject():
+    selected = dict(claims(), environment="zavaclaims", sub="repo:owner@456/claims@123:environment:zavaclaims")
+    assert onboarding.validate_claims(selected, repo(), "zavaclaims") == selected["sub"]
+    with pytest.raises(RuntimeError):
+        onboarding.validate_claims(claims(), repo(), "zavaclaims")
+    with pytest.raises(RuntimeError):
+        onboarding.validate_claims(dict(selected, sub=selected["sub"] + ":extra"), repo(), "zavaclaims")
+
+
+def test_new_environment_has_separate_state_without_overwriting_legacy(tmp_path, monkeypatch):
+    legacy = tmp_path / "onboarding-state.json"
+    legacy.write_text("legacy configuration")
+    monkeypatch.setattr(onboarding, "STATE", legacy)
+    selected = onboarding.onboarding_state_path("zavaclaims")
+    selected.write_text("new configuration")
+    assert selected != legacy and legacy.read_text() == "legacy configuration"
+    assert onboarding.onboarding_state_path("azure-demo") == legacy
+    with pytest.raises(RuntimeError):
+        onboarding.onboarding_state_path("../legacy")
+
+
+def test_oidc_discovery_dispatches_and_verifies_selected_environment(monkeypatch):
+    import json
+    selected = dict(claims(), environment="zavaclaims", sub="repo:owner/claims:environment:zavaclaims")
+    def workflow(repository, filename, title, inputs):
+        assert repository == "owner/claims" and filename == "oidc.yml"
+        assert inputs == {"environment": "zavaclaims"}
+        return 123
+    monkeypatch.setattr(onboarding, "workflow", workflow)
+    monkeypatch.setattr(onboarding, "run", lambda *args, **kwargs: "ONBOARDING_OIDC=" + json.dumps(selected))
+    assert onboarding.discover_subject("owner/claims", repo(), "zavaclaims") == selected["sub"]
+
+
 def test_redirect_merges_existing_uris_and_has_exact_trailing_slash(monkeypatch):
     app = {"spa": {"redirectUris": ["https://other.example/"]}}
 

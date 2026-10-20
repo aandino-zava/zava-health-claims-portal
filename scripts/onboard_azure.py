@@ -24,6 +24,12 @@ STATE = Path("work/onboarding-state.json")
 APPSERVICE_SKUS = ("B1", "B2", "B3", "S1", "S2", "S3", "P0v3", "P1v3", "P2v3", "P3v3")
 
 
+def onboarding_state_path(environment, override=None):
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", environment):
+        raise RuntimeError("Use a GitHub environment name with 1-64 letters, digits, hyphens, or underscores.")
+    return Path(override) if override else STATE if environment == "azure-demo" else STATE.with_name(f"onboarding-{environment}.json")
+
+
 def run(*args, body=None, raw=False, public_errors=False):
     """Use stdin for GitHub JSON/secrets; never echo command arguments or input."""
     executable = shutil.which(args[0])
@@ -280,26 +286,26 @@ def workflow(repo, filename, title_prefix, inputs, timeout=7200):
     raise RuntimeError("Workflow is still pending. Inspect Actions before rerunning onboarding.")
 
 
-def validate_claims(claims, repo_info):
+def validate_claims(claims, repo_info, environment="azure-demo"):
     expected = {"repository": repo_info["full_name"], "repository_id": str(repo_info["id"]),
-                "repository_owner_id": str(repo_info["owner"]["id"]), "environment": "azure-demo",
+                "repository_owner_id": str(repo_info["owner"]["id"]), "environment": environment,
                 "ref": "refs/heads/main", "iss": "https://token.actions.githubusercontent.com",
                 "aud": "api://AzureADTokenExchange"}
     if any(str(claims.get(key)) != value for key, value in expected.items()):
-        raise RuntimeError("OIDC metadata does not match this repository, main, and azure-demo.")
-    if not claims.get("sub") or ":environment:azure-demo" not in claims["sub"]:
-        raise RuntimeError("OIDC subject does not bind the azure-demo environment.")
+        raise RuntimeError("OIDC metadata does not match this repository, main, and selected environment.")
+    if not claims.get("sub", "").endswith(":environment:" + environment):
+        raise RuntimeError("OIDC subject does not bind the selected environment.")
     return claims["sub"]
 
 
-def discover_subject(repo, repo_info):
-    run_id = workflow(repo, "oidc.yml", "OIDC discovery", {})
+def discover_subject(repo, repo_info, environment="azure-demo"):
+    run_id = workflow(repo, "oidc.yml", "OIDC discovery", {"environment": environment})
     logs = run("gh", "run", "view", str(run_id), "--repo", repo, "--log", raw=True)
     rows = [line.split("ONBOARDING_OIDC=", 1)[1] for line in logs.splitlines()
             if "ONBOARDING_OIDC={" in line]
     if len(rows) != 1:
         raise RuntimeError("Could not read a unique OIDC discovery result.")
-    return validate_claims(json.loads(rows[0]), repo_info)
+    return validate_claims(json.loads(rows[0]), repo_info, environment)
 
 
 def set_redirect(spa_id, url):
@@ -323,6 +329,8 @@ def main():
     parser.add_argument("--subscription", required=True)
     parser.add_argument("--resource-group", required=True)
     parser.add_argument("--prefix", required=True)
+    parser.add_argument("--environment", default="zavaclaims", help="GitHub deployment environment; each target has separate variables, secrets, and state")
+    parser.add_argument("--state-file", help="Optional local onboarding state file")
     parser.add_argument("--location", default="eastus")
     parser.add_argument("--hosting", choices=("containerapps", "appservice"), default="containerapps")
     parser.add_argument("--database-sku", help="PostgreSQL SKU; defaults to the environment setting or Standard_B1ms")
@@ -330,10 +338,14 @@ def main():
     parser.add_argument("--database-server-name", help="Explicit name for a deliberately new PostgreSQL server")
     parser.add_argument("--appservice-sku", choices=APPSERVICE_SKUS)
     parser.add_argument("--appservice-location", help="Optional App Service region; retains the database in --location")
+    parser.add_argument("--registry-name", help="Optional explicit globally unique container registry name")
+    parser.add_argument("--webapp-name", help="Optional explicit globally unique App Service name")
     parser.add_argument("--employee", help="Employee object ID; defaults to the signed-in administrator")
     parser.add_argument("--deploy", action="store_true", help="Validate, deploy billable resources, and set redirect")
     parser.add_argument("--finalize", action="store_true", help="Set redirect from the existing claims-app deployment")
     args = parser.parse_args()
+    environment = args.environment
+    state_path = onboarding_state_path(environment, args.state_file)
     if not re.fullmatch(r"[a-z][a-z0-9]{2,15}", args.prefix):
         parser.error("prefix must be 3-16 lowercase letters/digits, starting with a letter")
     if not re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo):
@@ -347,24 +359,24 @@ def main():
     info = gh("repos/" + args.repo)
     if not info.get("permissions", {}).get("admin"):
         raise RuntimeError("GitHub repository administrator access is required.")
-    variables_path = f"repos/{args.repo}/environments/azure-demo/variables"
-    STATE.parent.mkdir(exist_ok=True)
-    if STATE.exists():
-        old = json.loads(STATE.read_text(encoding="utf-8"))
+    variables_path = f"repos/{args.repo}/environments/{environment}/variables"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    if state_path.exists():
+        old = json.loads(state_path.read_text(encoding="utf-8"))
         if old["repository"] != info["full_name"] or old["resource_group_id"].lower() != scope.lower():
             raise RuntimeError("Local onboarding state belongs to a different destination.")
     if args.finalize:
-        if not STATE.exists():
+        if not state_path.exists():
             raise RuntimeError("Run onboarding first to record the SPA registration.")
         url = run("az", "deployment", "group", "show", "-g", args.resource_group, "-n", "claims-app",
                   "--query", "properties.outputs.portalUrl.value", "--output", "tsv", raw=True).strip()
         old["portal_url"] = set_redirect(old["spa_object_id"], url)
-        STATE.write_text(json.dumps(old, indent=2) + "\n", encoding="utf-8")
+        state_path.write_text(json.dumps(old, indent=2) + "\n", encoding="utf-8")
         print("Sign-in redirect configured: " + old["portal_url"])
         return
-    environment_path = f"repos/{args.repo}/environments/azure-demo"
+    environment_path = f"repos/{args.repo}/environments/{environment}"
     environments = gh(f"repos/{args.repo}/environments?per_page=100")["environments"]
-    if not any(item["name"] == "azure-demo" for item in environments):
+    if not any(item["name"] == environment for item in environments):
         gh(environment_path, "PUT", {"deployment_branch_policy": {
             "protected_branches": False, "custom_branch_policies": True,
         }})
@@ -375,6 +387,12 @@ def main():
     database_name = args.database_server_name or current.get("AZURE_POSTGRES_SERVER_NAME")
     appservice_sku = args.appservice_sku or current.get("AZURE_APPSERVICE_SKU", "B1")
     appservice_location = args.appservice_location or current.get("AZURE_APPSERVICE_LOCATION") or args.location
+    registry_name = args.registry_name or current.get("AZURE_REGISTRY_NAME")
+    webapp_name = args.webapp_name or current.get("AZURE_WEBAPP_NAME")
+    if registry_name and not re.fullmatch(r"[a-z0-9]{5,50}", registry_name):
+        raise RuntimeError("Registry name must contain 5-50 lowercase letters or digits.")
+    if webapp_name and not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,58}[a-z0-9]", webapp_name):
+        raise RuntimeError("Web app name must contain 2-60 lowercase letters/digits/hyphens, with alphanumeric ends.")
     if not re.fullmatch(r"[a-z][a-z0-9]+", appservice_location):
         raise RuntimeError("Invalid App Service region code.")
     if database_name and not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", database_name):
@@ -391,7 +409,7 @@ def main():
         if current.get(key) and current[key] != expected:
             raise RuntimeError(f"Existing {key} differs; review destination settings before changing it.")
     print("Discovering the repository's actual OIDC subject (no Azure credentials in the job).", flush=True)
-    subject = discover_subject(args.repo, info)
+    subject = discover_subject(args.repo, info, environment)
     employee = args.employee or graph("me?$select=id")["id"]
     print("Configuring Entra registrations, consent, and demo employee roles.", flush=True)
     api, spa, deploy, deploy_sp = ensure_identities(args.prefix, employee, current)
@@ -400,7 +418,7 @@ def main():
     ensure_azure_role(deploy_sp["id"], CONTRIBUTOR, scope)
     ensure_azure_role(deploy_sp["id"], RBAC_ADMIN, scope, delegation_condition(runtime["principalId"]))
     federations = all_graph(f"applications/{deploy['id']}/federatedIdentityCredentials")
-    credential = {"name": "github-azure-demo", "issuer": "https://token.actions.githubusercontent.com",
+    credential = {"name": "github-" + environment, "issuer": "https://token.actions.githubusercontent.com",
                   "subject": subject, "audiences": ["api://AzureADTokenExchange"]}
     existing = next((item for item in federations if item["name"] == credential["name"]), None)
     endpoint = f"applications/{deploy['id']}/federatedIdentityCredentials"
@@ -415,6 +433,10 @@ def main():
                  "ENTRA_ALLOWED_CLIENT_IDS": spa["appId"], "SEED_DEMO": "true"}
     if database_name:
         variables["AZURE_POSTGRES_SERVER_NAME"] = database_name
+    if registry_name:
+        variables["AZURE_REGISTRY_NAME"] = registry_name
+    if webapp_name:
+        variables["AZURE_WEBAPP_NAME"] = webapp_name
     current = gh(environment_path + "/variables?per_page=100")["variables"]
     current = {item["name"]: item["value"] for item in current}
     # Preserve explicitly approved agent clients and the operator's seed preference on reruns.
@@ -431,21 +453,21 @@ def main():
     for key in ("DATABASE_ADMIN_PASSWORD", "DATABASE_APP_PASSWORD"):
         if key not in configured_secrets:
             password = "Aa1!" + secrets.token_urlsafe(36)
-            run("gh", "secret", "set", key, "--repo", args.repo, "--env", "azure-demo", body=password)
-    state = {"repository": info["full_name"], "repository_id": info["id"], "resource_group_id": scope,
+            run("gh", "secret", "set", key, "--repo", args.repo, "--env", environment, body=password)
+    state = {"repository": info["full_name"], "repository_id": info["id"], "resource_group_id": scope, "environment": environment,
              "oidc_subject": subject, "spa_object_id": spa["id"], "employee_object_id": employee,
              "variables": variables}
-    STATE.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
     print("Azure and GitHub onboarding configured. Existing database secrets were preserved.", flush=True)
-    state["validation_run"] = workflow(args.repo, "deploy.yml", "Deploy Azure demo", {"dry_run": "true"})
-    STATE.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    state["validation_run"] = workflow(args.repo, "deploy.yml", "Deploy Azure demo", {"dry_run": "true", "environment": environment})
+    state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
     if args.deploy:
-        state["deployment_run"] = workflow(args.repo, "deploy.yml", "Deploy Azure demo", {"dry_run": "false"})
-        STATE.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        state["deployment_run"] = workflow(args.repo, "deploy.yml", "Deploy Azure demo", {"dry_run": "false", "environment": environment})
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
         url = run("az", "deployment", "group", "show", "-g", args.resource_group, "-n", "claims-app",
                   "--query", "properties.outputs.portalUrl.value", "--output", "tsv", raw=True).strip()
         state["portal_url"] = set_redirect(spa["id"], url)
-        STATE.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
         print("Portal deployed; sign-in redirect configured: " + state["portal_url"], flush=True)
 
 

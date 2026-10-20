@@ -1,5 +1,7 @@
 targetScope = 'resourceGroup'
 param prefix string
+@description('Optional explicit globally unique web app name. Keep stable after deployment.')
+param webAppName string = '${prefix}-${uniqueString(resourceGroup().id)}-portal'
 param location string = 'eastus'
 param identityId string
 param image string
@@ -33,7 +35,7 @@ resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   properties: { reserved: true }
 }
 resource app 'Microsoft.Web/sites@2023-12-01' = {
-  name: '${prefix}-${uniqueString(resourceGroup().id)}-portal'
+  name: webAppName
   location: location
   kind: 'app,linux,container'
   identity: { type: 'UserAssigned', userAssignedIdentities: { '${identityId}': {} } }

@@ -1,54 +1,64 @@
 # How the application fits together
 
-[Back to the README](../README.md) · [Beginner's guide](BEGINNERS_GUIDE.md)
+[Back to the README](../README.md) Â· [Beginner's guide](BEGINNERS_GUIDE.md)
 
-## When someone uses the app
+## Application flow
 
 ```mermaid
 flowchart LR
-  Browser[Browser: HTML and JavaScript] -->|API requests| App[FastAPI: authorization and claim rules]
-  App --> DB[(Database)]
-  Future[Future agent integration] -.->|Authorized API requests| App
+  Browser[Browser: forms and results] -->|API requests| App[FastAPI: authorization, validation, claim rules]
+  Agent[Authorized agent] -->|Same API| App
+  App --> DB[(Database: claims and history)]
 ```
 
-FastAPI serves both the browser files and the REST API from one application. Claim rules live in Python; the browser presents the forms and results. The database preserves records between requests and restarts, provided its file or storage volume is retained.
+FastAPI serves both the browser files and REST API. Python owns the claim rules; the browser gathers input and displays results. Agents use the same authorized endpoints. Agent-platform connections are configured separately.
 
-| Environment | Database | Identity | Hosting |
+| Environment | Database | Identity | Host |
 | --- | --- | --- | --- |
-| Local PowerShell script | SQLite file by default | Built-in development identity | Your computer, localhost only |
-| Local Docker Compose | PostgreSQL with a named volume | Built-in development identity | Containers on your computer |
-| Azure | Private PostgreSQL Flexible Server | Microsoft Entra | App Service or Container Apps |
+| Local PowerShell | SQLite file by default | Development identity | Localhost |
+| Docker Compose | PostgreSQL named volume | Development identity | Local containers |
+| Zava Azure demo | Private PostgreSQL 16, East US 2 | Microsoft Entra | App Service B1, Central US |
 
-Choose App Service or Container Apps for your Azure deployment. Both options run the same application and claim rules.
+The database file or volume must be retained for local data to survive restarts. Azure stores claims in PostgreSQL independently of the app container.
 
-## When someone deploys the app
+## Azure deployment
 
 ```mermaid
 flowchart LR
-  GitHub[Manual GitHub deployment workflow] --> Bicep[Bicep templates]
-  Bicep --> Resources[Azure hosting, database, networking, registry, identity]
-  GitHub --> Build[Build Docker image in Azure Container Registry]
-  Build --> Host[Run image on selected Azure host]
-  Resources --> Host
+  Setup[Administrator onboarding] --> Identity[Entra registrations and permissions]
+  Setup --> GitHub[GitHub azure-demo and OIDC]
+  GitHub --> Deploy[Bicep deployment and ACR image build]
+  subgraph CentralUS[Central US]
+    App[App Service B1 and web VNet]
+  end
+  subgraph EastUS2[East US 2]
+    DB[(Private PostgreSQL 16 and database VNet)]
+    Shared[Registry, runtime identity, Log Analytics]
+  end
+  Deploy --> App
+  Deploy --> DB
+  Deploy --> Shared
+  App -->|VNet peering and private DNS| DB
+  Shared -->|Managed identity image pull| App
 ```
 
-- [foundation.bicep](../infra/foundation.bicep) defines shared resources such as networking, PostgreSQL, the registry, and runtime identity.
-- [app-service.bicep](../infra/app-service.bicep) configures App Service hosting.
-- [app.bicep](../infra/app.bicep) configures the alternative Container Apps host.
-- [deploy.yml](../.github/workflows/deploy.yml) coordinates provisioning, image building, deployment, and a readiness check.
+The verified Zava profile keeps the database and shared services in East US 2 and uses available App Service capacity in Central US. [Onboarding](DEPLOYMENT.md#automated-onboarding) creates the identities and GitHub settings, runs validation/deployment, then uses the administrator session to set the SPA redirect URL.
 
-**Bicep creates infrastructure; Python implements application behavior; Docker packages the application.** GitHub's validation workflow tests changes. The separate deployment workflow runs only when explicitly triggered.
+| Source | Responsibility |
+| --- | --- |
+| [onboard_azure.py](../scripts/onboard_azure.py) | Administrator setup, OIDC discovery, workflow execution, redirect |
+| [foundation.bicep](../infra/foundation.bicep) | Database, registry, identity, logs, networking, optional cross-region peering |
+| [app-service.bicep](../infra/app-service.bicep) | App Service plan and container configuration |
+| [app.bicep](../infra/app.bicep) | Alternative Container Apps hosting |
+| [deploy.yml](../.github/workflows/deploy.yml) | Preflight, provisioning, image build, deployment, readiness |
 
-## What is portable?
+Both Azure hosts run the same application. GitHub deploys only when triggered by an operator or onboarding; CI validates changes separately.
 
-The application logic does not depend on Azure SDKs. Docker and PostgreSQL can run elsewhere. Bicep and the supplied deployment workflow target Azure public cloud. Entra is the selected identity provider; replacing it requires changes to token verification and browser sign-in.
+## Design choices and limits
 
-A new Azure environment still needs its own identities, permissions, configuration, available capacity, and compatible policies. Portability does not bypass those requirements.
+- **Separate setup and runtime permissions.** Startup uses an administrator connection for migrations and optional seeding, serialized with a PostgreSQL advisory lock. The API then uses a restricted database account. Bootstrap credentials stay in hosting settings for later starts; see [deployment boundaries](DEPLOYMENT.md#operational-boundaries).
+- **Keep the demo portable.** Application logic has no Azure SDK dependency. Docker/PostgreSQL can run elsewhere; the supplied Bicep and workflows target Azure public cloud. Replacing Entra requires changes to token validation and browser sign-in.
+- **Keep history with the claim.** Structured columns plus JSON payload/history support the demo. They are not an immutable enterprise audit system.
+- **Match controls to the scope.** Request limits and JSON events are included. Production monitoring, distributed abuse protection, load testing, and recovery exercises need separate work.
 
-## Current design boundaries
-
-Database migrations run at startup using a separate administrator connection, with a PostgreSQL advisory lock to serialize cooperating startup processes. The API then runs with a restricted database user; see [Deployment](DEPLOYMENT.md) for credential and restart behavior. Demo seeding is optional in that startup path. This keeps the small demo convenient; controlled release migrations are preferable for larger deployments.
-
-The claim table stores structured fields plus JSON payload and history. That supports this demonstration; it is not an immutable enterprise audit system.
-
-Structured console logs and modest per-instance request limits are included. The repository does not configure a complete production monitoring, distributed abuse-protection, or disaster-recovery solution. See [deployment caveats](DEPLOYMENT.md#operational-boundaries) and [demo checks](VALIDATION.md) before expanding its use. Future Copilot/Foundry integration is an intended extension, not a completed component.
+A new tenant still needs administrator authorization, available capacity, and compatible policies. [Validation](VALIDATION.md) distinguishes automated checks from verified live behavior.

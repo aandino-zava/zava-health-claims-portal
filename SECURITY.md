@@ -1,11 +1,11 @@
 # Security and demo boundaries
 
-Use fictitious records only. Readers share the demo workspace; the app does not isolate claims by patient or owner and is not a healthcare production baseline.
+Use fictitious data only. Authorized readers share the workspace; claims are not isolated by patient or owner. This is a demo, not a production healthcare baseline.
 
-Report suspected vulnerabilities privately to the repository owner through GitHub. If private vulnerability reporting is enabled, use Security > Report a vulnerability. Otherwise contact the owner privately before opening an issue containing sensitive details. Do not include credentials or patient data.
+Report suspected vulnerabilities privately to the repository owner. Use **Security â†’ Report a vulnerability** if enabled; otherwise contact the owner privately. Keep credentials and patient information out of issues.
 
-The main branch is the supported version. Review dependency update pull requests and run CI before merging. Changes to database access, identity, or infrastructure also require deployment checks in the target environment.
+`main` is the supported branch. Review dependency updates and run CI before merging. Database, identity, and infrastructure changes also need checks in the target environment.
 
-Structured application events omit request bodies, tokens, queries, claim notes, and patient fields. Claim history remains in the database; it is not an immutable external audit store. Hosting administrators can access configured bootstrap credentials. Restrict their permissions and rotate both database credentials when needed.
+Application events omit bodies, queries, tokens, notes, and personal fields. Claim history stays in PostgreSQL and is not an immutable audit store. Hosting administrators can access bootstrap credentials in settings; restrict those permissions and rotate both database credentials when needed.
 
-The in-process API throttle is a small demo safeguard, not distributed abuse protection. Each instance maintains its own counters; users behind a shared proxy may share a limit. Review proxy trust and add an appropriate gateway policy before exposing a busy or broadly shared deployment.
+API throttling is per instance and client address. Users behind a proxy can share limits. Review proxy trust and add suitable gateway controls before expanding access. See [deployment boundaries](docs/DEPLOYMENT.md#operational-boundaries) and [validation](docs/VALIDATION.md).

@@ -1,57 +1,49 @@
 # Run the demo on your computer
 
-[Back to the README](../README.md) · [Beginner's guide](BEGINNERS_GUIDE.md)
+[Back to the README](../README.md) Â· [Beginner's guide](BEGINNERS_GUIDE.md)
 
-Choose one option below. Neither local option needs a cloud subscription or Entra registration. Use invented data only.
+Choose either option. Both use a local development identity with all three roles and require no Azure account. Use fictitious data only.
 
 ## Option 1: Windows PowerShell
 
-Install Python 3.12 or newer and [uv](https://docs.astral.sh/uv/getting-started/installation/), the tool that installs this project's Python dependencies.
-
-Clone the repository using Git (you need access to the repository), or download and extract its ZIP from GitHub's Code menu. Open PowerShell in the folder containing README.md and Start-Local.ps1.
+Install Python 3.12+ and [uv](https://docs.astral.sh/uv/getting-started/installation/). Clone the repo or extract its ZIP, then open PowerShell in the folder containing `Start-Local.ps1`:
 
 ```powershell
 .\Start-Local.ps1
 ```
 
-The script installs the locked dependencies, prepares the database tables, adds eight sample claims, and starts the server.
+The script installs locked dependencies, prepares the database, seeds eight claims, and starts the app. Open **http://127.0.0.1:8000**. Keep the terminal open; press **Ctrl+C** to stop.
 
-Open **http://127.0.0.1:8000**. Keep PowerShell open while using the app; press **Ctrl+C** there to stop it.
+Data stays in `claims.db` by default. If your shell already defines `DATABASE_URL`, the script uses that database instead. Use a disposable local database because this path enables development authentication. Repeated starts do not duplicate seeded claims.
 
-By default, data is stored in claims.db in the project folder and survives a restart. If DATABASE_URL is already set in your shell, the script uses that database instead. Use a disposable local database: this script enables development authentication.
-
-If PowerShell cannot find uv, finish installing it and open a new terminal. If port 8000 is occupied, stop the other local server before trying again.
+If `uv` is not found, finish installing it and open a new terminal. If port 8000 is occupied, stop the other local server.
 
 ## Option 2: Docker Compose
 
-With Docker and Docker Compose installed and running, open a terminal in the repository folder:
+With Docker and Compose installed and running:
 
 ```powershell
 docker compose up --build
 ```
 
-Open **http://127.0.0.1:8000**. This option runs the app with PostgreSQL and stores database data in a Docker named volume.
-
-To stop the services:
+Open **http://127.0.0.1:8000**. Compose runs PostgreSQL and retains data in a named volume. Stop with:
 
 ```powershell
 docker compose down
 ```
 
-The volume remains, preserving your test data. Adding --volumes would delete that data. The password in compose.yaml is for isolated local development only.
+The volume remains. Adding `--volumes` deletes the saved data. Compose credentials are for isolated local development only.
 
-## What to try
+## Try one workflow
 
-File a fictitious claim, open its details in Claims Tracker, record a reviewer update, and reload the page. The claim and history should persist. Seeded records are not duplicated when you restart.
+File a synthetic claim, open its details, record a reviewer update, and reload. Confirm the claim and history persist. Local mode does not verify Entra sign-in; use [Azure onboarding](DEPLOYMENT.md#automated-onboarding) for that deployment.
 
-Local mode supplies all three roles automatically. It is useful for learning the workflow but does not verify Entra authentication. Azure setup is a separate path in [Deployment](DEPLOYMENT.md).
-
-## Optional developer checks
+## Developer checks
 
 ```powershell
 uv sync --frozen
 uv run pytest -q -p no:cacheprovider
-uv run ruff check app tests
+uv run ruff check app tests scripts migrations
 ```
 
-The PostgreSQL-specific test requires a disposable PostgreSQL database; GitHub CI supplies one. Passing local tests alone does not verify Azure deployment or tenant sign-in.
+PostgreSQL-specific tests need a disposable PostgreSQL database; GitHub CI supplies one. See [Validation](VALIDATION.md) for what each check establishes.

@@ -1,45 +1,48 @@
 # Check your demo
 
-[Back to the README](../README.md) · [Deployment](DEPLOYMENT.md)
+[Back to the README](../README.md) Â· [Deployment](DEPLOYMENT.md)
 
-Use these checks after setting up your own environment. A successful deployment or health check alone does not verify sign-in or agent access.
-
-## Before deployment
-
-Run **Deploy Azure demo** with **dry_run checked**. Resolve the configuration and repository errors it reports before requesting a real deployment. This is an offline check; it does not establish access to your Azure environment.
-
-For Copilot integration, CI also checks the generated v2 definition against the API routes, parameters, and response models. Follow [Connect Copilot Studio](COPILOT_STUDIO.md) for the separate import, OAuth, and browser checks in your target environment.
-
-## Try the browser workflow
-
-1. Open the portal. In Azure, sign in with an assigned work account; local mode supplies a demo identity.
-2. Confirm the Dashboard and Claims Tracker load.
-3. Submit a claim using fictitious member and provider details.
-4. Open its details and record a permitted status change with a test note.
-5. Reload the page and confirm the claim, status, and history remain.
-6. Check that Analytics reflects the stored claims.
-7. Confirm a request ID appears in response headers and corresponding JSON events reach your Log Analytics workspace.
-
-## Check API access
-
-- Confirm /health/ready returns a ready response.
-- In Entra mode, call /api/v1/claims without a token and expect HTTP 401.
-- Confirm an assigned reader can read but cannot submit or review without the corresponding roles.
-- Confirm an unauthorized identity cannot read claims.
-- Connect your agent using [the API guide](API.md). Verify its permitted operations and rejected operations with synthetic data.
-
-Local development bypasses real sign-in, so it cannot validate your Entra configuration. Test agent authentication through the actual platform you intend to demonstrate.
+Check the whole workflow. A successful deployment or health response does not establish browser sign-in or agent access.
 
 ## Automated checks
 
-Repository checks catch missing guides, unexpected document headings, obvious misplaced Python content, broken local link paths, and startup syntax problems. These are structural checks, not a review of documentation accuracy or link anchors.
+| Check | What it establishes |
+| --- | --- |
+| Repository checks | Required guides, local link paths, balanced code fences, startup syntax. Link anchors and prose accuracy need review. |
+| Application and signed-token tests | Claim rules, validation, retries, filtering, totals, authorization, readiness, limits, and diagnostic redaction. |
+| PostgreSQL integration | Migrations, persistence, aggregates, restricted-role read/write/review, and denied deletion/schema/role/migration-metadata access. |
+| Frontend and API contracts | JavaScript syntax, escaping, error handling, seven-operation Copilot export, and template freshness. |
+| Infrastructure and container checks | Bicep compilation, parameter contracts, deployment guards, image build, fixable high/critical vulnerability scan, and container readiness. |
 
-The [CI workflow](../.github/workflows/ci.yml) runs application and signed-token tests, PostgreSQL integration, JavaScript syntax checks, Bicep compilation, a Docker build, and a container readiness check using separate bootstrap/runtime database users, plus a scan for fixable high/critical image vulnerabilities. Deployment-tool tests cover invalid configuration, client-list consistency, secret-value redaction, parameter contracts for both hosting choices, and validation-only workflow guards.
+The [CI workflow](../.github/workflows/ci.yml) also verifies that bootstrap credentials are removed before server execution and reports combined Python branch coverage. Coverage describes exercised code; scenario testing is still required.
 
-Tests cover claim creation, duplicate-request handling, filtering, aggregates, input validation, authorization, and status updates. PostgreSQL integration applies migrations and checks basic persistence and aggregation.
+**Deploy Azure demo** with `dry_run` checked runs offline validation. It does not log in to Azure, build an image, provision resources, or prove quota and policy acceptance. Real deployment adds live preflight and a database readiness check.
 
-These checks do not replace browser regression tests, load tests, backup recovery exercises, or verification of your own subscription policies and identity configuration. Copilot/Foundry integration must be configured and tested separately.
+## Verified in Zava
 
-PostgreSQL tests prove the restricted role can create/read/review claims and is denied deletion, schema changes, migration metadata access, and role creation. Failure-path tests cover database readiness, throttling, oversized streamed bodies, diagnostic redaction, and removal of bootstrap credentials before server execution. Frontend tests exercise escaping of agent-provided text and API error handling. These focused tests do not substitute for a complete automated browser sign-in suite.
+On October 20, 2026, the [Azure deployment](https://github.com/aandino-zava/zava-health-claims-portal/actions/runs/39369414180) succeeded with App Service B1 in Central US and private PostgreSQL 16 in East US 2. The following checks passed:
 
-CI prints a combined Python branch-coverage report after PostgreSQL integration. It reports exercised code; it does not certify correctness or replace the scenario checks above.
+- Database readiness and Entra tenant/SPA configuration.
+- HTTP 401 for an unauthenticated `/api/v1/claims` request.
+- Work-account browser sign-in and loading the eight seeded claims.
+- Submission of a fictitious claim and retrieval of that same claim after a full page reload.
+- Stored claim details and the reviewer controls were visible.
+
+The unused East US VNet and three security groups were removed afterward. Live readiness, the three Entra registrations, and the current/rollback images were verified intact.
+
+## Still to verify
+
+Reader-only and unassigned-user isolation, a live reviewer status update, sign-out, and Log Analytics event delivery need scenario checks in the target environment. Copilot Studio/Foundry import, authentication, orchestration, and computer use remain unverified. A clean onboarding run against a second tenant has not been performed.
+
+Load, failover, backup recovery, and a complete automated browser sign-in suite are outside the current evidence.
+
+## Repeat and record acceptance
+
+1. Sign in with an assigned work account. Confirm Dashboard and Claims Tracker load.
+2. Submit fictitious member/provider details. Record the returned claim ID.
+3. Open the claim, record a permitted status change with a test note, and reload. Confirm the record and history persist, and Analytics updates.
+4. Call `/health/ready`; expect `ready`. Call `/api/v1/claims` without a token; expect 401.
+5. Check that Reader alone cannot submit/review and that an unassigned identity cannot read claims. Confirm each permitted role works independently.
+6. Match a response's `X-Request-ID` to its JSON event in Log Analytics. Test your agent's allowed and rejected operations through its actual platform.
+
+Record the date, environment, deployed commit, workflow URL, claim ID, observed results, and any open items. Local mode supplies all roles and bypasses Entra, so it cannot establish tenant authentication or role isolation.

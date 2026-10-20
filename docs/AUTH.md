@@ -1,29 +1,32 @@
 # Entra configuration
 
-Create two single-tenant app registrations in the destination tenant. Use different client IDs for the API and the browser SPA. No browser client secret is needed.
+[Back to the README](../README.md) Â· [Deployment](DEPLOYMENT.md)
 
-The [automated onboarding command](DEPLOYMENT.md#automated-onboarding) creates these registrations, grants SPA consent, assigns your demo roles, and configures the deployed redirect URI. The instructions below describe the equivalent manual configuration.
+Start with [automated onboarding](DEPLOYMENT.md#automated-onboarding). It creates separate single-tenant API, browser SPA, and deployment registrations; grants consent and demo roles; configures GitHub OIDC; and sets the deployed redirect URL. The browser needs no client secret.
+
+Use the steps below for manual setup or troubleshooting.
 
 ## API registration
 
 1. Set the application ID URI to `api://<API_CLIENT_ID>`.
-2. Expose delegated scope `Claims.Access` and set `api.requestedAccessTokenVersion` to `2` in the manifest.
-3. Define enabled app roles `Claims.Reader`, `Claims.Writer`, and `Claims.Reviewer`, each allowing Users/Groups and Applications. Use unique GUIDs for their role IDs.
-4. Assign the required roles to demo employees through the API enterprise application. Roles are independent: a reviewer normally needs Reader as well; someone filing claims normally needs Reader and Writer.
+2. Expose delegated scope `Claims.Access`. Set `api.requestedAccessTokenVersion` to `2`.
+3. Define enabled `Claims.Reader`, `Claims.Writer`, and `Claims.Reviewer` app roles with unique GUIDs and Users/Groups plus Applications allowed.
+4. Assign demo users their roles through the API enterprise application. Roles are independent: readers read, writers submit, and reviewers change status. A full browser workflow needs all three.
 
 ## Browser registration
 
-1. Add a Single-page application platform, with redirect URI exactly the deployed portal origin followed by `/`.
-2. Add delegated permission to the API's `Claims.Access` scope and obtain required tenant consent.
-3. Include this SPA client ID in `ENTRA_ALLOWED_CLIENT_IDS`.
-4. Set the GitHub environment variables described in DEPLOYMENT.md.
+1. Add the Single-page application platform with the exact HTTPS portal origin followed by `/` as its redirect URI.
+2. Grant delegated access to `Claims.Access` and the required tenant consent.
+3. Include the SPA client ID in `ENTRA_ALLOWED_CLIENT_IDS` and set the [deployment variables](DEPLOYMENT.md#manual-setup-reference).
 
-The first deployment reports the portal URL for your chosen hosting service. Add that exact redirect URI before attempting sign-in. The UI uses MSAL authorization code with PKCE; MSAL caches tokens in sessionStorage for the browser tab. The server validates signature, expiry, issuer, audience, tenant, authorized client and required role. Delegated tokens must also carry `Claims.Access`.
+Onboarding sets the returned redirect automatically. For a new host deployed manually, use onboarding with `--finalize` or add the exact URI yourself.
+
+The UI uses MSAL authorization code with PKCE and tab-scoped `sessionStorage`. The API validates signature, expiry, issuer, audience, tenant, client allowlist, and role. Delegated tokens also need `Claims.Access`. Claim data is authorized; the root page, assets, health endpoints, authentication configuration, and API schema are public.
 
 ## Agent clients
 
-Register each authorized agent client separately. Assign only its necessary API application roles, grant administrator consent, and add its client ID to the comma-separated allowlist. Request a token for `api://<API_CLIENT_ID>/.default` using a supported confidential-client flow. Prefer managed/federated identity where the chosen agent platform supports it. Do not put client secrets in source code or browser code.
+Register each agent client separately and add its client ID to the allowlist. Delegated calls need `Claims.Access` and the user's app roles. Application-only calls need assigned API application roles, administrator consent, and a token for `api://<API_CLIENT_ID>/.default`.
 
-Delegated agent calls need `Claims.Access` plus the signed-in user's app roles. An application-only token needs application roles. Configure the agent platform to call the same `/api/v1` endpoints as the browser; the application does not require an AI model.
+Prefer managed or federated identity where the agent platform supports it. Keep client secrets out of source, browser code, and agent instructions. [Copilot Studio](COPILOT_STUDIO.md) has its own connector/client setup; Azure onboarding does not create that connection.
 
-Live tenant consent, token issuance, role assignment, sign-in and sign-out must be verified in the chosen tenant after deployment. Unit tests with locally signed tokens do not establish that the tenant is configured correctly.
+Test consent, token issuance, role isolation, sign-in, and sign-out in the receiving tenant. Locally signed test tokens cannot establish that configuration.

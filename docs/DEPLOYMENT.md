@@ -29,7 +29,9 @@ Failed server creation can leave a name reserved after its ARM resource disappea
 
 App Service defaults to B1. If your subscription has zero quota for Basic, select a permitted size with `--appservice-sku P0v3`, for example, and require successful ARM validation. The deployment identity retains its resource-group scope. A higher hosting tier changes ongoing costs. Supported sizes are B1-B3, S1-S3, and P0v3-P3v3.
 
-Both onboarding and real GitHub deployments also submit a small, secret-free App Service plan template to ARM **validation only** before provisioning. This catches per-size VM quotas that the regional usage summary can misrepresent. It creates no hosting resources and uses the deployment identity's existing resource-group permissions. If validation reports a VM quota of zero, request at least one instance of the selected size through Azure support before rerunning deployment. Selecting a larger size is not a substitute for a successful native validation.
+Both onboarding and real GitHub deployments also submit a small, secret-free App Service plan template to ARM **validation only** before provisioning. This catches per-size VM quotas that the regional usage summary can misrepresent. It creates no hosting resources and uses the deployment identity's existing resource-group permissions. If validation reports a VM quota of zero, use a hosting region with available quota or obtain an increase for the selected region. Selecting a larger size is not a substitute for successful native validation.
+
+To retain an existing database while hosting elsewhere, keep `--location` unchanged and add `--appservice-location centralus` (or another region that passes validation). The command saves `AZURE_APPSERVICE_LOCATION`; the templates create a web VNet in that region, bidirectional peering to the database VNet, and a private DNS link. Database access remains private. This uses App Service's supported [VNet integration and global peering](https://learn.microsoft.com/en-us/azure/app-service/overview-vnet-integration) and adds inter-region network charges. Changing the foundation region is not a database migration.
 
 The command:
 

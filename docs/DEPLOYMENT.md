@@ -38,6 +38,8 @@ If deployment succeeded but the local session expired before redirect configurat
 
 The initial local administrator sign-ins and any tenant-required approval remain interactive. This is the bootstrap trust boundary: an unconfigured GitHub repository cannot authorize itself to administer your tenant.
 
+Real deployment also checks the subscription's advertised PostgreSQL 16 / Standard_B1ms availability before provisioning. For Container Apps, it detects a pending `AllowBringYourOwnPublicIpAddress` feature approval that can block the environment network. The same check runs locally before `--deploy` changes setup and in GitHub after OIDC login. These checks catch known service restrictions; they do not guarantee regional capacity or replace ARM policy evaluation. Offline `dry_run` remains unchanged. If PostgreSQL reports regional restrictions, request access through Azure support or explicitly choose an available region. A feature requiring Microsoft approval cannot be approved by this script.
+
 ## Manual alternative
 
 The following settings and steps provide the equivalent manual route and help troubleshoot a partial onboarding run.

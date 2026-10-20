@@ -186,6 +186,36 @@ def delegation_condition(runtime_principal):
     )
 
 
+def azure_readiness(location, hosting):
+    """Check service-advertised restrictions before creating billable infrastructure."""
+    capabilities = run("az", "postgres", "flexible-server", "list-skus", "--location", location,
+                       "--output", "json")
+    errors = []
+    available = False
+    for capability in capabilities:
+        versions = capability.get("supportedServerVersions", [])
+        editions = capability.get("supportedServerEditions", [])
+        version = any(item.get("name") == "16" for item in versions)
+        sku = any(item.get("name", "").lower() == "standard_b1ms"
+                  for edition in editions if edition.get("name") == "Burstable"
+                  for item in edition.get("supportedServerSkus", []))
+        available |= version and sku
+    if not available:
+        reasons = sorted({item["reason"] for item in capabilities if item.get("reason")})
+        errors.append(f"PostgreSQL 16 / Standard_B1ms is not advertised for this subscription in {location}. "
+                      + " ".join(reasons))
+    if hosting == "containerapps":
+        feature = run("az", "feature", "show", "--namespace", "Microsoft.Network",
+                      "--name", "AllowBringYourOwnPublicIpAddress", "--output", "json")
+        if feature.get("properties", {}).get("state") == "Pending":
+            errors.append("Microsoft.Network/AllowBringYourOwnPublicIpAddress is Pending approval; "
+                          "this subscription cannot provision the requested Container Apps network. "
+                          "Resolve the approval with Azure support or select App Service.")
+    if errors:
+        raise RuntimeError("Azure subscription readiness failed:\n- " + "\n- ".join(errors))
+    print(f"Azure advertises PostgreSQL 16 / Standard_B1ms in {location}; no checked blocker found.", flush=True)
+
+
 def workflow(repo, filename, title_prefix, inputs, timeout=7200):
     request_id = str(uuid4())
     key = "request_id" if filename == "oidc.yml" else "onboarding_id"
@@ -275,6 +305,8 @@ def main():
     run("az", "account", "set", "--subscription", args.subscription)
     group = run("az", "group", "show", "--name", args.resource_group, "--output", "json")
     scope = group["id"]
+    if args.deploy:
+        azure_readiness(args.location, args.hosting)
     info = gh("repos/" + args.repo)
     if not info.get("permissions", {}).get("admin"):
         raise RuntimeError("GitHub repository administrator access is required.")

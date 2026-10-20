@@ -1,0 +1,22 @@
+name: Discover Azure OIDC subject
+run-name: OIDC discovery · ${{ inputs.request_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: Correlation ID supplied by the onboarding command
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    environment: azure-demo
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Report federation metadata without disclosing tokens
+        run: python scripts/oidc_claims.py

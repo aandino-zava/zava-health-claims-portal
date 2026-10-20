@@ -57,6 +57,8 @@ Building a Copilot Studio agent? Start with the [API and browser integration gui
 
 Application tests and infrastructure checks run in GitHub CI. Azure deployment is a separate, manually triggered workflow. It defaults to **validation-only**; uncheck `dry_run` when you are ready to create Azure resources. See the [deployment sequence](docs/DEPLOYMENT.md).
 
+For a new tenant or repository, the [administrator onboarding command](docs/DEPLOYMENT.md#automated-onboarding) creates the Entra registrations, API permissions, GitHub federation, deployment settings, and database secrets. Add `--deploy` to validate, deploy, and configure the SPA redirect URI in the same run.
+
 ## License and maintenance
 
 [MIT license](LICENSE) · [Security guidance](SECURITY.md)

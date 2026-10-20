@@ -8,12 +8,39 @@ For the fastest local trial, use [Docker Compose](RUN-LOCALLY.md). Follow this g
 
 1. Fork or copy this repository into your GitHub account.
 2. Choose a resource group, region, and hosting option in your Azure subscription.
-3. Configure Entra sign-in and the GitHub deployment identity using the prerequisites below.
-4. Set the GitHub environment variables and database secret.
-5. Run **Deploy Azure demo** with **dry_run checked** to validate configuration first.
-6. When validation passes, run it again with **dry_run unchecked** to create resources. Configure the returned sign-in redirect URL and [check your demo](VALIDATION.md).
+3. Run the administrator onboarding command below to create the identities and configure GitHub.
+4. The command runs **Deploy Azure demo** with **dry_run checked** to validate configuration first.
+5. Include `--deploy` to continue after validation, create Azure resources, and configure the returned sign-in redirect URI automatically.
+6. Sign in and [check your demo](VALIDATION.md).
 
-This is a parameterized deployment, not a one-click setup: identity permissions and subscription policies require preparation.
+## Automated onboarding
+
+Install Python 3.12+, Azure CLI, and GitHub CLI (`gh`), then sign in with `az login --tenant <TENANT_ID>` and `gh auth login --scopes workflow`. Run from the repository root after these scripts and workflows are on `main` in your destination repository. The account running setup needs permission to create app registrations and service principals, grant tenant consent to this custom API, assign employee app roles, and create resource-group role assignments. Global Administrator plus Azure Owner on the target resource group satisfies these prerequisites; use narrower administrator roles where your tenant permits. GitHub repository administrator access is required. The command cannot grant its operator these privileges.
+
+```powershell
+python scripts/onboard_azure.py --repo OWNER/REPOSITORY --tenant TENANT_ID --subscription SUBSCRIPTION_ID --resource-group RESOURCE_GROUP --prefix UNIQUE_PREFIX --location eastus --hosting containerapps --deploy
+```
+
+Omit `--deploy` to configure onboarding and run validation only. This still creates identity metadata, an Azure managed identity, and access assignments; it does not provision hosting or PostgreSQL. With `--deploy`, the command creates billable resources after validation passes. Choose `appservice` if that is your preferred hosting option before the first deployment.
+
+The command:
+
+- Creates or reuses three single-tenant registrations named `<prefix>-claims-api`, `<prefix>-claims-spa`, and `<prefix>-github-deploy`. It configures v2 API tokens, `Claims.Access`, and the three claim roles; grants SPA consent; and assigns Reader, Writer, and Reviewer to the signed-in administrator (or the object ID supplied with `--employee`).
+- Creates `azure-demo` if missing, restricting a new environment to deployments from `main`. Existing protection and approval rules are preserved, so a protected environment may wait for your review in Actions.
+- Runs **Discover Azure OIDC subject** to obtain the exact environment subject, including immutable IDs where applicable. Only selected non-secret claims are logged. It validates the repository IDs, issuer, audience, environment, and branch before creating federation. It does not guess the subject from repository age or change the repository's OIDC settings.
+- Creates the runtime managed identity and gives the deployment principal resource-group Contributor access. Its additional RBAC Administrator delegation is conditioned on **AcrPull for that runtime principal only**, for both assignment creation and deletion. The deployment identity receives no Microsoft Graph application permission or client secret.
+- Writes deployment variables and creates separate random database passwords directly through `gh secret set` stdin. Existing secrets are preserved, and passwords are never stored in onboarding state. Existing approved agent clients and the seed preference are preserved.
+- Runs offline validation, optionally waits for deployment, then uses the local administrator session to add the actual HTTPS portal origin with a trailing `/` to the SPA. Existing redirect URIs are preserved.
+
+State and workflow run IDs are saved in ignored `work/onboarding-state.json`; it contains identifiers, not passwords or tokens. Rerun with the same arguments to recover from partial setup. Duplicate registration names and conflicting prefix/hosting/client settings stop setup for review. The command does not remove old-tenant identities or resources, alter existing environment protections, rotate existing database passwords, or grant directory administration to GitHub.
+
+If deployment succeeded but the local session expired before redirect configuration, sign in again and run the same command with `--finalize` instead of `--deploy`. This reads the existing `claims-app` deployment output and completes the redirect without redeploying infrastructure. Normal later releases use **Deploy Azure demo**; the host name and redirect stay stable when the prefix and hosting option are unchanged. Changing the host requires rerunning `--finalize`.
+
+The initial local administrator sign-ins and any tenant-required approval remain interactive. This is the bootstrap trust boundary: an unconfigured GitHub repository cannot authorize itself to administer your tenant.
+
+## Manual alternative
+
+The following settings and steps provide the equivalent manual route and help troubleshoot a partial onboarding run.
 
 ## Prerequisites
 
@@ -58,7 +85,7 @@ A passing result **does not verify** registration existence, tenant/subscription
 1. Confirm application CI is green for the commit being deployed.
 2. Run Actions > **Deploy Azure demo** > Run workflow on the intended branch and **uncheck dry_run**. This authorizes the workflow to create/update billable Azure resources. The same validation checks run before Azure login.
 3. The workflow provisions a VNet, private PostgreSQL Flexible Server/database, private DNS, Container Registry, managed identity and Log Analytics. It creates either a Container Apps environment or a Linux App Service B1 plan and web app, then builds the image and deploys the application.
-4. Read the reported URL in the workflow summary and configure the SPA redirect URI as described in AUTH.md.
+4. The onboarding command configures the reported SPA redirect URI automatically. For a manual workflow run against a new host, run onboarding with `--finalize`, or configure it as described in AUTH.md.
 5. Sign in with an assigned demo employee; submit a synthetic claim and confirm it survives reload. Verify a reader cannot submit/review, an unassigned user cannot read data, and an approved agent can call the API.
 
 `/health/ready` succeeding verifies database connectivity/schema, not Entra sign-in. The root page, static assets, health endpoints, authentication configuration and API schema are public; claim data endpoints require authorization.

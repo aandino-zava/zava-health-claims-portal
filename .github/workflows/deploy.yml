@@ -1,7 +1,12 @@
 name: Deploy Azure demo
+run-name: Deploy Azure demo · ${{ inputs.onboarding_id || github.run_number }}
 on:
   workflow_dispatch:
     inputs:
+      onboarding_id:
+        description: Optional correlation ID supplied by the onboarding command
+        type: string
+        required: false
       dry_run:
         description: 'Validate configuration and templates only (no Azure login, deployment, or image build)'
         type: boolean

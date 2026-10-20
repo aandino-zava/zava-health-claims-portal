@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+.pytest_cache/
+pytest-cache-files-*/
+.ruff_cache/
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+work/
+*.log
+*.zip
+infra/*.parameters.json
+.coverage
+htmlcov/

@@ -1,0 +1,131 @@
+name: Deploy Azure demo
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Validate configuration and templates only (no Azure login, deployment, or image build)'
+        type: boolean
+        required: true
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: deploy-azure-demo
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    environment: azure-demo
+    env:
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_DEPLOY_CLIENT_ID: ${{ vars.AZURE_DEPLOY_CLIENT_ID }}
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'eastus' }}
+      AZURE_HOSTING: ${{ vars.AZURE_HOSTING || 'containerapps' }}
+      AZURE_PREFIX: ${{ vars.AZURE_PREFIX }}
+      ENTRA_API_CLIENT_ID: ${{ vars.ENTRA_API_CLIENT_ID }}
+      ENTRA_SPA_CLIENT_ID: ${{ vars.ENTRA_SPA_CLIENT_ID }}
+      ENTRA_ALLOWED_CLIENT_IDS: ${{ vars.ENTRA_ALLOWED_CLIENT_IDS }}
+      DATABASE_ADMIN_PASSWORD: ${{ secrets.DATABASE_ADMIN_PASSWORD }}
+      DATABASE_APP_PASSWORD: ${{ secrets.DATABASE_APP_PASSWORD }}
+      SEED_DEMO: ${{ vars.SEED_DEMO || 'true' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with: { version: '0.8.22', python-version: '3.12' }
+      - name: Check deployment configuration
+        run: python scripts/preflight_tenant.py
+      - name: Check repository structure
+        run: python scripts/check_repo.py
+      - name: Compile infrastructure templates
+        run: |
+          mkdir -p work/templates
+          az bicep install
+          for template in foundation app app-service; do
+            az bicep build --file "infra/$template.bicep" --outfile "work/templates/$template.json"
+          done
+      - name: Test before deployment
+        run: |
+          uv sync --frozen
+          uv run python -m scripts.export_copilot --template --check
+          REQUIRE_COMPILED_TEMPLATES=1 uv run pytest -q -p no:cacheprovider
+          uv run ruff check app tests scripts migrations
+          node --check app/static/app.js
+          node --test tests/frontend.test.cjs
+      - name: Validate generated parameter contracts
+        run: python scripts/deployment_parameters.py --dry-run
+      - name: Report validation-only result
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo 'Validation-only passed. No Azure login, deployment, or registry build was performed.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Parameter checks used fictitious infrastructure outputs. Permissions, policies, capacity, identity registrations, and sign-in remain unverified.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove validation parameters
+        if: always()
+        run: rm -f work/validation/*.parameters.json
+  deploy:
+    if: ${{ !inputs.dry_run }}
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: azure-demo
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_DEPLOY_CLIENT_ID: ${{ vars.AZURE_DEPLOY_CLIENT_ID }}
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'eastus' }}
+      AZURE_HOSTING: ${{ vars.AZURE_HOSTING || 'containerapps' }}
+      AZURE_PREFIX: ${{ vars.AZURE_PREFIX }}
+      ENTRA_API_CLIENT_ID: ${{ vars.ENTRA_API_CLIENT_ID }}
+      ENTRA_SPA_CLIENT_ID: ${{ vars.ENTRA_SPA_CLIENT_ID }}
+      ENTRA_ALLOWED_CLIENT_IDS: ${{ vars.ENTRA_ALLOWED_CLIENT_IDS }}
+      DATABASE_ADMIN_PASSWORD: ${{ secrets.DATABASE_ADMIN_PASSWORD }}
+      DATABASE_APP_PASSWORD: ${{ secrets.DATABASE_APP_PASSWORD }}
+      SEED_DEMO: ${{ vars.SEED_DEMO || 'true' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Recheck deployment configuration
+        run: python scripts/preflight_tenant.py
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
+        if: ${{ !inputs.dry_run }}
+        with:
+          client-id: ${{ vars.AZURE_DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Build parameter files without logging secrets
+        if: ${{ !inputs.dry_run }}
+        run: python scripts/deployment_parameters.py
+      - name: Provision foundation
+        if: ${{ !inputs.dry_run }}
+        run: |
+          az deployment group create --resource-group "$AZURE_RESOURCE_GROUP" --name claims-foundation --template-file infra/foundation.bicep --parameters @work/foundation.parameters.json --output none
+          az deployment group show --resource-group "$AZURE_RESOURCE_GROUP" --name claims-foundation --query properties.outputs --output json > work/foundation.outputs.json
+      - name: Build and publish container
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: |
+          REGISTRY=$(python -c "import json;print(json.load(open('work/foundation.outputs.json'))['registryName']['value'])")
+          az acr build --registry "$REGISTRY" --image "health-claims-portal:$GITHUB_SHA" . --output none
+      - name: Deploy application
+        if: ${{ !inputs.dry_run }}
+        run: |
+          python scripts/deployment_parameters.py --app
+          TEMPLATE=infra/app.bicep
+          if [ "$AZURE_HOSTING" = appservice ]; then TEMPLATE=infra/app-service.bicep; fi
+          az deployment group create --resource-group "$AZURE_RESOURCE_GROUP" --name claims-app --template-file "$TEMPLATE" --parameters @work/app.parameters.json --output none
+          URL=$(az deployment group show --resource-group "$AZURE_RESOURCE_GROUP" --name claims-app --query properties.outputs.portalUrl.value --output tsv)
+          for i in $(seq 1 60); do
+            if curl --fail --silent --max-time 10 "$URL/health/ready"; then
+              echo "Portal deployed: $URL" >> "$GITHUB_STEP_SUMMARY"
+              echo 'Verify the SPA redirect URI and complete an authenticated smoke test.' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Readiness check failed'; exit 1
+      - name: Remove temporary parameter files
+        if: always()
+        run: rm -f work/foundation.parameters.json work/app.parameters.json work/validation/*.parameters.json

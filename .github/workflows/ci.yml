@@ -1,0 +1,71 @@
+name: Validate application
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: claims_ci
+          POSTGRES_USER: claims
+          POSTGRES_PASSWORD: ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U claims -d claims_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: '0.8.22'
+          python-version: '3.12'
+      - run: python scripts/check_repo.py
+      - name: Validate infrastructure syntax
+        run: |
+          mkdir -p work/templates
+          az bicep install
+          az bicep build --file infra/foundation.bicep --outfile work/templates/foundation.json
+          az bicep build --file infra/app.bicep --outfile work/templates/app.json
+          az bicep build --file infra/app-service.bicep --outfile work/templates/app-service.json
+      - run: uv sync --frozen
+      - name: Check Copilot API contract
+        run: uv run python -m scripts.export_copilot --template --check
+      - run: REQUIRE_COMPILED_TEMPLATES=1 uv run pytest -q -p no:cacheprovider --cov=app --cov=scripts --cov-branch --cov-report=
+      - run: uv run ruff check app tests scripts migrations
+      - name: PostgreSQL integration tests
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg://claims:ci-only@localhost:5432/claims_ci
+        run: uv run pytest -q tests/test_postgres.py -p no:cacheprovider --cov=app --cov=scripts --cov-branch --cov-append --cov-report=term-missing --cov-report=xml:work/coverage.xml
+      - run: node --check app/static/app.js
+      - run: node --test tests/frontend.test.cjs
+      - name: Build container
+        run: docker build -t health-claims-portal:ci .
+      - name: Scan container for fixable high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: health-claims-portal:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Smoke test container
+        run: |
+          docker run -d --name portal-ci --network host -e ENVIRONMENT=test -e AUTH_MODE=development -e DATABASE_URL=postgresql+psycopg://claims_app:ci-app-only@localhost:5432/claims_ci -e MIGRATION_DATABASE_URL=postgresql+psycopg://claims:ci-only@localhost:5432/claims_ci health-claims-portal:ci
+          for i in $(seq 1 30); do
+            if curl --fail http://localhost:8000/health/ready; then exit 0; fi
+            sleep 2
+          done
+          docker logs portal-ci
+          exit 1
+      - name: Verify restricted server process
+        run: |
+          docker exec portal-ci python -c "from pathlib import Path; assert b'MIGRATION_DATABASE_URL=' not in Path('/proc/1/environ').read_bytes()"
+          docker exec portal-ci python -c "import os; from sqlalchemy import create_engine,text; c=create_engine(os.environ['DATABASE_URL']).connect(); assert c.scalar(text('SELECT current_user')) == 'claims_app'"

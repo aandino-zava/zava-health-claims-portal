@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HealthClaim · Claims Portal</title>
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css"><link rel="stylesheet" href="/static/app.css">
+<script defer src="/static/vendor/msal-browser.min.js"></script><script defer src="/static/app.js"></script></head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<aside id="sidebar"><div class="brand"><span class="brand-icon">✚</span><div><strong>HealthClaim</strong><small>Claims Portal</small></div></div>
+<nav aria-label="Main navigation"><button data-view="dashboard" class="active">▦ <span>Dashboard</span></button><button data-view="new">＋ <span>File New Claim</span></button><button data-view="tracker">⌕ <span>Claims Tracker</span></button><button data-view="analytics">▥ <span>Analytics</span></button></nav>
+<div class="sidebar-bottom"><span class="badge rounded-pill text-bg-light">SYNTHETIC DATA</span><p>An internal claims demonstration</p><button id="collapse" aria-expanded="true" aria-label="Collapse navigation">◀ Collapse</button></div></aside>
+<div id="shell"><header class="topbar"><span>Health insurance workspace</span><div><span id="identity"></span> <button id="login" class="btn btn-sm btn-outline-primary" hidden>Sign in</button><button id="logout" class="btn btn-sm btn-outline-secondary" hidden>Sign out</button></div></header>
+<div class="demo-banner">Demo environment · Use fictitious information only. No real patient or insurance data.</div>
+<div id="notice" role="status" aria-live="polite"></div><main id="content" tabindex="-1"><p class="loading">Loading your workspace…</p></main>
+<footer>HealthClaim · Independent, portable claims application <a href="/docs" target="_blank" rel="noopener">API documentation ↗</a></footer></div>
+<dialog id="detail-dialog" aria-labelledby="detail-title"><div id="detail-body"></div></dialog>
+</body></html>

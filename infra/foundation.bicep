@@ -10,6 +10,9 @@ param hosting string = 'containerapps'
 @secure()
 param databasePassword string
 param databaseUser string = 'claimsadmin'
+param databaseSku string = 'Standard_B1ms'
+@allowed(['Burstable', 'GeneralPurpose', 'MemoryOptimized'])
+param databaseTier string = 'Burstable'
 
 var suffix = uniqueString(resourceGroup().id)
 var registryName = '${prefix}${suffix}'
@@ -76,7 +79,7 @@ resource dnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-
 resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
   name: '${prefix}-${suffix}-pg'
   location: location
-  sku: { name: 'Standard_B1ms', tier: 'Burstable' }
+  sku: { name: databaseSku, tier: databaseTier }
   properties: {
     version: '16'
     administratorLogin: databaseUser

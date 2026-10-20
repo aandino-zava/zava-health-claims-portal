@@ -29,6 +29,8 @@ jobs:
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'eastus' }}
       AZURE_HOSTING: ${{ vars.AZURE_HOSTING || 'containerapps' }}
       AZURE_PREFIX: ${{ vars.AZURE_PREFIX }}
+      AZURE_POSTGRES_SKU: ${{ vars.AZURE_POSTGRES_SKU || 'Standard_B1ms' }}
+      AZURE_POSTGRES_TIER: ${{ vars.AZURE_POSTGRES_TIER || 'Burstable' }}
       ENTRA_API_CLIENT_ID: ${{ vars.ENTRA_API_CLIENT_ID }}
       ENTRA_SPA_CLIENT_ID: ${{ vars.ENTRA_SPA_CLIENT_ID }}
       ENTRA_ALLOWED_CLIENT_IDS: ${{ vars.ENTRA_ALLOWED_CLIENT_IDS }}
@@ -84,6 +86,8 @@ jobs:
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'eastus' }}
       AZURE_HOSTING: ${{ vars.AZURE_HOSTING || 'containerapps' }}
       AZURE_PREFIX: ${{ vars.AZURE_PREFIX }}
+      AZURE_POSTGRES_SKU: ${{ vars.AZURE_POSTGRES_SKU || 'Standard_B1ms' }}
+      AZURE_POSTGRES_TIER: ${{ vars.AZURE_POSTGRES_TIER || 'Burstable' }}
       ENTRA_API_CLIENT_ID: ${{ vars.ENTRA_API_CLIENT_ID }}
       ENTRA_SPA_CLIENT_ID: ${{ vars.ENTRA_SPA_CLIENT_ID }}
       ENTRA_ALLOWED_CLIENT_IDS: ${{ vars.ENTRA_ALLOWED_CLIENT_IDS }}

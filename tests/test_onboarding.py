@@ -134,3 +134,14 @@ def test_missing_configured_registration_never_creates_replacement(monkeypatch):
     monkeypatch.setattr(onboarding, "all_graph", lambda path: [])
     with pytest.raises(RuntimeError, match="not found"):
         onboarding.application("newprefix-claims-api", "11111111-1111-4111-8111-111111111111")
+
+
+def test_readiness_checks_selected_database_size_instead_of_default(monkeypatch):
+    monkeypatch.setattr(onboarding, "run", lambda *args: [{
+        "supportedServerVersions": [{"name": "16"}], "supportedServerEditions": [
+            {"name": "Burstable", "supportedServerSkus": [{"name": "Standard_B2s"}]},
+        ],
+    }])
+    onboarding.azure_readiness("eastus2", "appservice", "Standard_B2s", "Burstable")
+    with pytest.raises(RuntimeError, match="Standard_B1ms"):
+        onboarding.azure_readiness("eastus2", "appservice")

@@ -145,3 +145,12 @@ def test_readiness_checks_selected_database_size_instead_of_default(monkeypatch)
     onboarding.azure_readiness("eastus2", "appservice", "Standard_B2s", "Burstable")
     with pytest.raises(RuntimeError, match="Standard_B1ms"):
         onboarding.azure_readiness("eastus2", "appservice")
+
+
+def test_appservice_zero_basic_quota_and_available_premium_quota():
+    usage = [{"name": {"localizedValue": "Basic"}, "limit": 0, "currentValue": 0},
+             {"name": {"localizedValue": "Premium v3"}, "limit": 360, "currentValue": 0}]
+    assert "insufficient" in onboarding.appservice_quota_error(usage, "B1")
+    assert onboarding.appservice_quota_error(usage, "P0v3") is None
+    usage[1].update(limit=2, currentValue=1)
+    assert "insufficient" in onboarding.appservice_quota_error(usage, "P1v3")

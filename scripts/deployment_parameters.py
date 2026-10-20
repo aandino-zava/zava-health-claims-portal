@@ -24,6 +24,8 @@ def parameters(env, outputs=None):
                 else ("environmentId", "identityId", "registryServer", "databaseHost"))
         for key in keys:
             params[key] = outputs[key]["value"]
+        if hosting == "appservice":
+            params["appServiceSku"] = env.get("AZURE_APPSERVICE_SKU", "B1")
         params.update(
             appDatabasePassword=env["DATABASE_APP_PASSWORD"],
             seedDemo=env.get("SEED_DEMO", "true").lower() == "true",

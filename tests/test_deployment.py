@@ -121,7 +121,7 @@ def test_live_parameters_keep_contract(hosting):
     actual = parameters(env, outputs)["parameters"]
     expected = {"prefix", "location", "databasePassword", "identityId", "databaseHost", "image",
                 "tenantId", "apiClientId", "spaClientId", "allowedClientIds", "appDatabasePassword", "seedDemo"}
-    expected |= {"webSubnetId", "logsWorkspaceId"} if hosting == "appservice" else {"environmentId", "registryServer"}
+    expected |= {"webSubnetId", "logsWorkspaceId", "appServiceSku"} if hosting == "appservice" else {"environmentId", "registryServer"}
     assert set(actual) == expected
     assert actual["databasePassword"]["value"] == env["DATABASE_ADMIN_PASSWORD"]
     assert actual["image"]["value"] == "validationonly.azurecr.io/health-claims-portal:test-commit"
@@ -189,3 +189,10 @@ def test_explicit_server_name_is_stable_and_optional():
     assert parameters(env)["parameters"]["databaseServerName"]["value"] == "claims-recovery-db"
     assert validate(dict(config(), AZURE_POSTGRES_SERVER_NAME="claims-recovery-db")) == []
     assert validate(dict(config(), AZURE_POSTGRES_SERVER_NAME="BAD_NAME"))
+
+
+def test_app_service_capacity_override():
+    env = dict(runtime_config("appservice"), AZURE_APPSERVICE_SKU="P0v3")
+    assert parameters(env, fixture_outputs())["parameters"]["appServiceSku"]["value"] == "P0v3"
+    assert validate(dict(config(), AZURE_APPSERVICE_SKU="P0v3")) == []
+    assert validate(dict(config(), AZURE_APPSERVICE_SKU="invalid"))

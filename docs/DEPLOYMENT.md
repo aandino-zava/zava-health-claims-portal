@@ -27,6 +27,8 @@ If Azure rejects the default database size with `SkuNotAvailable`, select an ava
 
 Failed server creation can leave a name reserved after its ARM resource disappears. For an empty environment only, use `--database-server-name <fresh-unique-name>` to deliberately create a new server. The name is saved for later releases. Changing this setting in a populated environment creates a different database; it does not migrate existing claims. Keep the selected name stable once data is stored.
 
+App Service defaults to B1. If your subscription has zero quota for Basic, select a permitted size with `--appservice-sku P0v3`, for example. Onboarding checks the administrator's regional quota response before provisioning; the deployment identity retains its resource-group scope. A higher hosting tier changes ongoing costs. Supported sizes are B1-B3, S1-S3, and P0v3-P3v3.
+
 The command:
 
 - Creates or reuses three single-tenant registrations named `<prefix>-claims-api`, `<prefix>-claims-spa`, and `<prefix>-github-deploy`. It configures v2 API tokens, `Claims.Access`, and the three claim roles; grants SPA consent; and assigns Reader, Writer, and Reviewer to the signed-in administrator (or the object ID supplied with `--employee`).
@@ -66,6 +68,7 @@ Create a GitHub environment named `azure-demo`. If you restrict deployment branc
 | AZURE_RESOURCE_GROUP | Existing target resource group |
 | AZURE_LOCATION | `eastus` unless overridden |
 | AZURE_HOSTING | `containerapps` (default) or `appservice`; choose before initial deployment |
+| AZURE_APPSERVICE_SKU | Optional App Service size; default `B1`, or a supported Standard/Premium v3 size with available quota |
 | AZURE_PREFIX | Unique deployment prefix, e.g. `claimsdev` |
 | AZURE_POSTGRES_SKU | Optional database size; default `Standard_B1ms`, e.g. `Standard_B2s` where B1ms is unavailable |
 | AZURE_POSTGRES_TIER | Optional `Burstable` (default), `GeneralPurpose`, or `MemoryOptimized`; must match the size |
@@ -93,7 +96,7 @@ A passing result **does not verify** registration existence, tenant/subscription
 
 1. Confirm application CI is green for the commit being deployed.
 2. Run Actions > **Deploy Azure demo** > Run workflow on the intended branch and **uncheck dry_run**. This authorizes the workflow to create/update billable Azure resources. The same validation checks run before Azure login.
-3. The workflow provisions a VNet, private PostgreSQL Flexible Server/database, private DNS, Container Registry, managed identity and Log Analytics. It creates either a Container Apps environment or a Linux App Service B1 plan and web app, then builds the image and deploys the application.
+3. The workflow provisions a VNet, private PostgreSQL Flexible Server/database, private DNS, Container Registry, managed identity and Log Analytics. It creates either a Container Apps environment or a Linux App Service plan (B1 by default, configurable) and web app, then builds the image and deploys the application.
 4. The onboarding command configures the reported SPA redirect URI automatically. For a manual workflow run against a new host, run onboarding with `--finalize`, or configure it as described in AUTH.md.
 5. Sign in with an assigned demo employee; submit a synthetic claim and confirm it survives reload. Verify a reader cannot submit/review, an unassigned user cannot read data, and an approved agent can call the API.
 

@@ -28,6 +28,7 @@ jobs:
       AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'eastus' }}
       AZURE_HOSTING: ${{ vars.AZURE_HOSTING || 'containerapps' }}
+      AZURE_APPSERVICE_SKU: ${{ vars.AZURE_APPSERVICE_SKU || 'B1' }}
       AZURE_PREFIX: ${{ vars.AZURE_PREFIX }}
       AZURE_POSTGRES_SKU: ${{ vars.AZURE_POSTGRES_SKU || 'Standard_B1ms' }}
       AZURE_POSTGRES_TIER: ${{ vars.AZURE_POSTGRES_TIER || 'Burstable' }}
@@ -86,6 +87,7 @@ jobs:
       AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'eastus' }}
       AZURE_HOSTING: ${{ vars.AZURE_HOSTING || 'containerapps' }}
+      AZURE_APPSERVICE_SKU: ${{ vars.AZURE_APPSERVICE_SKU || 'B1' }}
       AZURE_PREFIX: ${{ vars.AZURE_PREFIX }}
       AZURE_POSTGRES_SKU: ${{ vars.AZURE_POSTGRES_SKU || 'Standard_B1ms' }}
       AZURE_POSTGRES_TIER: ${{ vars.AZURE_POSTGRES_TIER || 'Burstable' }}

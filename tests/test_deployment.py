@@ -115,6 +115,7 @@ def test_live_parameters_keep_contract(hosting):
     assert foundation == {k: {"value": v} for k, v in {
         "prefix": env["AZURE_PREFIX"], "location": "eastus", "databasePassword": env["DATABASE_ADMIN_PASSWORD"],
         "hosting": hosting,
+        "databaseSku": "Standard_B1ms", "databaseTier": "Burstable",
     }.items()}
     outputs = fixture_outputs()
     actual = parameters(env, outputs)["parameters"]
@@ -169,3 +170,13 @@ def test_database_passwords_must_be_separate():
     c = config()
     c["DATABASE_APP_PASSWORD"] = c["DATABASE_ADMIN_PASSWORD"]
     assert any("different password" in error for error in validate(c))
+
+
+def test_database_capacity_override_is_passed_to_foundation():
+    env = dict(runtime_config("appservice"), AZURE_POSTGRES_SKU="Standard_B2s", AZURE_POSTGRES_TIER="Burstable")
+    assert validate(dict(config(), **{k: env[k] for k in ("AZURE_POSTGRES_SKU", "AZURE_POSTGRES_TIER")})) == []
+    result = parameters(env)["parameters"]
+    assert result["databaseSku"]["value"] == "Standard_B2s"
+    assert result["databaseTier"]["value"] == "Burstable"
+    assert validate(dict(config(), AZURE_POSTGRES_SKU="invalid"))
+    assert validate(dict(config(), AZURE_POSTGRES_TIER="invalid"))

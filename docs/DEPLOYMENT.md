@@ -23,6 +23,8 @@ python scripts/onboard_azure.py --repo OWNER/REPOSITORY --tenant TENANT_ID --sub
 
 Omit `--deploy` to configure onboarding and run validation only. This still creates identity metadata, an Azure managed identity, and access assignments; it does not provision hosting or PostgreSQL. With `--deploy`, the command creates billable resources after validation passes. Choose `appservice` if that is your preferred hosting option before the first deployment.
 
+If Azure rejects the default database size with `SkuNotAvailable`, select an available size explicitly, for example `--database-sku Standard_B2s --database-tier Burstable`. The command saves these values as GitHub environment variables and reuses them on subsequent runs. Changing database size changes Azure costs. Capability discovery reports what Azure advertises; actual provisioning can still reject a listed size because of capacity or subscription restrictions.
+
 The command:
 
 - Creates or reuses three single-tenant registrations named `<prefix>-claims-api`, `<prefix>-claims-spa`, and `<prefix>-github-deploy`. It configures v2 API tokens, `Claims.Access`, and the three claim roles; grants SPA consent; and assigns Reader, Writer, and Reviewer to the signed-in administrator (or the object ID supplied with `--employee`).
@@ -38,7 +40,7 @@ If deployment succeeded but the local session expired before redirect configurat
 
 The initial local administrator sign-ins and any tenant-required approval remain interactive. This is the bootstrap trust boundary: an unconfigured GitHub repository cannot authorize itself to administer your tenant.
 
-Real deployment also checks the subscription's advertised PostgreSQL 16 / Standard_B1ms availability before provisioning. For Container Apps, it detects a pending `AllowBringYourOwnPublicIpAddress` feature approval that can block the environment network. The same check runs locally before `--deploy` changes setup and in GitHub after OIDC login. These checks catch known service restrictions; they do not guarantee regional capacity or replace ARM policy evaluation. Offline `dry_run` remains unchanged. If PostgreSQL reports regional restrictions, request access through Azure support or explicitly choose an available region. A feature requiring Microsoft approval cannot be approved by this script.
+Real deployment also checks the subscription's advertised PostgreSQL 16 availability for the selected database size before provisioning. For Container Apps, it detects a pending `AllowBringYourOwnPublicIpAddress` feature approval that can block the environment network. The same check runs locally before `--deploy` changes setup and in GitHub after OIDC login. These checks catch known service restrictions; they do not guarantee regional capacity or replace ARM policy evaluation. Offline `dry_run` remains unchanged. If PostgreSQL reports regional restrictions, request access through Azure support or explicitly choose an available region. A feature requiring Microsoft approval cannot be approved by this script.
 
 ## Manual alternative
 
@@ -63,6 +65,8 @@ Create a GitHub environment named `azure-demo`. If you restrict deployment branc
 | AZURE_LOCATION | `eastus` unless overridden |
 | AZURE_HOSTING | `containerapps` (default) or `appservice`; choose before initial deployment |
 | AZURE_PREFIX | Unique deployment prefix, e.g. `claimsdev` |
+| AZURE_POSTGRES_SKU | Optional database size; default `Standard_B1ms`, e.g. `Standard_B2s` where B1ms is unavailable |
+| AZURE_POSTGRES_TIER | Optional `Burstable` (default), `GeneralPurpose`, or `MemoryOptimized`; must match the size |
 | ENTRA_API_CLIENT_ID | API registration client GUID |
 | ENTRA_SPA_CLIENT_ID | Browser registration client GUID |
 | ENTRA_ALLOWED_CLIENT_IDS | SPA and approved agent client GUIDs, comma-separated |
@@ -113,3 +117,4 @@ Container Apps sends console output to the provisioned Log Analytics workspace. 
 The API limits bodies to 64 KiB and requests to 120/minute per client address per instance by default. Limits are configurable with `MAX_REQUEST_BYTES` and `REQUESTS_PER_MINUTE` in hosting settings. Health probes are exempt. Proxy/NAT users can share a limit; verify trusted-proxy settings for your host. This is a demo safeguard, not a distributed gateway or DDoS protection.
 
 For rollback, redeploy a previous known-good image/commit after checking schema compatibility. No automatic database downgrade is attempted. Remove only this demo's dedicated resource group when retiring it, after preserving any required test data; resource deletion is not performed by these workflows.
+

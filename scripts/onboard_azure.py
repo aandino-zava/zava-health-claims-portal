@@ -195,7 +195,7 @@ def delegation_condition(runtime_principal):
     )
 
 
-def azure_readiness(location, hosting):
+def azure_readiness(location, hosting, database_sku="Standard_B1ms", database_tier="Burstable"):
     """Check service-advertised restrictions before creating billable infrastructure."""
     capabilities = run("az", "postgres", "flexible-server", "list-skus", "--location", location,
                        "--output", "json")
@@ -205,13 +205,13 @@ def azure_readiness(location, hosting):
         versions = capability.get("supportedServerVersions", [])
         editions = capability.get("supportedServerEditions", [])
         version = any(item.get("name") == "16" for item in versions)
-        sku = any(item.get("name", "").lower() == "standard_b1ms"
-                  for edition in editions if edition.get("name") == "Burstable"
+        sku = any(item.get("name", "").lower() == database_sku.lower()
+                  for edition in editions if edition.get("name") == database_tier
                   for item in edition.get("supportedServerSkus", []))
         available |= version and sku
     if not available:
         reasons = sorted({item["reason"] for item in capabilities if item.get("reason")})
-        errors.append(f"PostgreSQL 16 / Standard_B1ms is not advertised for this subscription in {location}. "
+        errors.append(f"PostgreSQL 16 / {database_sku} is not advertised for this subscription in {location}. "
                       + " ".join(reasons))
     if hosting == "containerapps":
         feature = run("az", "feature", "show", "--namespace", "Microsoft.Network",
@@ -222,7 +222,7 @@ def azure_readiness(location, hosting):
                           "Resolve the approval with Azure support or select App Service.")
     if errors:
         raise RuntimeError("Azure subscription readiness failed:\n- " + "\n- ".join(errors))
-    print(f"Azure advertises PostgreSQL 16 / Standard_B1ms in {location}; no checked blocker found.", flush=True)
+    print(f"Azure advertises PostgreSQL 16 / {database_sku} in {location}; no checked blocker found.", flush=True)
 
 
 def workflow(repo, filename, title_prefix, inputs, timeout=7200):
@@ -300,6 +300,8 @@ def main():
     parser.add_argument("--prefix", required=True)
     parser.add_argument("--location", default="eastus")
     parser.add_argument("--hosting", choices=("containerapps", "appservice"), default="containerapps")
+    parser.add_argument("--database-sku", help="PostgreSQL SKU; defaults to the environment setting or Standard_B1ms")
+    parser.add_argument("--database-tier", choices=("Burstable", "GeneralPurpose", "MemoryOptimized"))
     parser.add_argument("--employee", help="Employee object ID; defaults to the signed-in administrator")
     parser.add_argument("--deploy", action="store_true", help="Validate, deploy billable resources, and set redirect")
     parser.add_argument("--finalize", action="store_true", help="Set redirect from the existing claims-app deployment")
@@ -314,8 +316,6 @@ def main():
     run("az", "account", "set", "--subscription", args.subscription)
     group = run("az", "group", "show", "--name", args.resource_group, "--output", "json")
     scope = group["id"]
-    if args.deploy:
-        azure_readiness(args.location, args.hosting)
     info = gh("repos/" + args.repo)
     if not info.get("permissions", {}).get("admin"):
         raise RuntimeError("GitHub repository administrator access is required.")
@@ -342,6 +342,12 @@ def main():
         }})
         gh(environment_path + "/deployment-branch-policies", "POST", {"name": "main", "type": "branch"})
     current = {item["name"]: item["value"] for item in gh(variables_path + "?per_page=100")["variables"]}
+    database_sku = args.database_sku or current.get("AZURE_POSTGRES_SKU", "Standard_B1ms")
+    database_tier = args.database_tier or current.get("AZURE_POSTGRES_TIER", "Burstable")
+    if not re.fullmatch(r"Standard_[A-Za-z0-9_]+", database_sku):
+        raise RuntimeError("Invalid PostgreSQL SKU name.")
+    if args.deploy:
+        azure_readiness(args.location, args.hosting, database_sku, database_tier)
     for key, expected in {"AZURE_TENANT_ID": args.tenant, "AZURE_SUBSCRIPTION_ID": args.subscription,
                           "AZURE_PREFIX": args.prefix, "AZURE_HOSTING": args.hosting,
                           "AZURE_RESOURCE_GROUP": args.resource_group}.items():
@@ -365,6 +371,7 @@ def main():
     variables = {"AZURE_TENANT_ID": args.tenant, "AZURE_SUBSCRIPTION_ID": args.subscription,
                  "AZURE_DEPLOY_CLIENT_ID": deploy["appId"], "AZURE_RESOURCE_GROUP": args.resource_group,
                  "AZURE_LOCATION": args.location, "AZURE_HOSTING": args.hosting, "AZURE_PREFIX": args.prefix,
+                 "AZURE_POSTGRES_SKU": database_sku, "AZURE_POSTGRES_TIER": database_tier,
                  "ENTRA_API_CLIENT_ID": api["appId"], "ENTRA_SPA_CLIENT_ID": spa["appId"],
                  "ENTRA_ALLOWED_CLIENT_IDS": spa["appId"], "SEED_DEMO": "true"}
     current = gh(environment_path + "/variables?per_page=100")["variables"]

@@ -1,12 +1,12 @@
 # Connect an agent to the claims API
 
-[Back to the README](../README.md) Â· [Copilot Studio](COPILOT_STUDIO.md)
+[Back to the README](../README.md) · [Copilot Studio](COPILOT_STUDIO.md)
 
 Deploy the app, configure the agent's access, then use the deployed origin plus `/api/v1` as its API base URL. A cloud agent needs a reachable host; localhost works only on your computer.
 
 ## Demo tasks
 
-| Ask the agent toâ€¦ | Operation |
+| Ask the agent to… | Operation |
 | --- | --- |
 | Find a member's synthetic claims | Search claims |
 | Explain progress | Read claim details and history |
@@ -53,7 +53,7 @@ Use the generated schema for exact fields and parameters. A minimal creation bod
 
 - **Create:** send an `Idempotency-Key`. Reuse it only for an identical retry from the same identity. A new claim returns 201; a replay returns the original claim with 200; a changed payload returns 409. Use a new key for a new submission. Service dates cannot be in the future.
 - **Review:** send `status`, `expected_version` from the latest detail response, and a meaningful `note`. Invalid transitions and stale versions return 409. Refetch and review before retrying.
-- **Transitions:** Submitted â†’ Under Review; Under Review â†’ Pending Info/Approved/Denied; Pending Info â†’ Under Review; Denied â†’ In Appeal; In Appeal â†’ Under Review. Approved is terminal.
+- **Transitions:** Submitted → Under Review; Under Review → Pending Info/Approved/Denied; Pending Info → Under Review; Denied → In Appeal; In Appeal → Under Review. Approved is terminal.
 
 Responses include `X-Request-ID`. Defaults are 64 KiB per JSON body and 120 API requests/minute per client address per instance. On 429, honor `Retry-After` with bounded retries. See [deployment safeguards](DEPLOYMENT.md#logs-and-demo-safeguards).
 

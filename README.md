@@ -10,8 +10,8 @@ A web app and REST API for agentic AI demos. Submit synthetic claims, track thei
 | --- | --- |
 | Try the app on your computer | [Run locally](docs/RUN-LOCALLY.md) |
 | Set up identities, GitHub, and Azure | [Automated onboarding](docs/DEPLOYMENT.md#automated-onboarding) |
-| Connect an agent | [API](docs/API.md) Â· [Copilot Studio](docs/COPILOT_STUDIO.md) |
-| Understand the solution | [Architecture](docs/ARCHITECTURE.md) Â· [Beginner's guide](docs/BEGINNERS_GUIDE.md) |
+| Connect an agent | [API](docs/API.md) · [Copilot Studio](docs/COPILOT_STUDIO.md) |
+| Understand the solution | [Architecture](docs/ARCHITECTURE.md) · [Beginner's guide](docs/BEGINNERS_GUIDE.md) |
 | Check your deployment | [Validation](docs/VALIDATION.md) |
 
 ## Run locally
@@ -51,4 +51,4 @@ Azure resources incur charges, including while the demo is idle. Read the [deplo
 
 CI checks the application, API contracts, infrastructure, and container. Later Azure releases use the manual **Deploy Azure demo** workflow, which defaults to validation only. Review dependency updates before merging. Browser libraries are vendored with licenses and an integrity manifest; update them through `scripts/vendor_assets.py`.
 
-[MIT license](LICENSE) Â· [Entra configuration](docs/AUTH.md)
+[MIT license](LICENSE) · [Entra configuration](docs/AUTH.md)

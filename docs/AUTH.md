@@ -1,6 +1,6 @@
 # Entra configuration
 
-[Back to the README](../README.md) Â· [Deployment](DEPLOYMENT.md)
+[Back to the README](../README.md) · [Deployment](DEPLOYMENT.md)
 
 Start with [automated onboarding](DEPLOYMENT.md#automated-onboarding). It creates separate single-tenant API, browser SPA, and deployment registrations; grants consent and demo roles; configures GitHub OIDC; and sets the deployed redirect URL. The browser needs no client secret.
 

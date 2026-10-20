@@ -1,6 +1,6 @@
 # Beginner's guide
 
-[Back to the README](../README.md) Â· [Run locally](RUN-LOCALLY.md)
+[Back to the README](../README.md) · [Run locally](RUN-LOCALLY.md)
 
 Start with the local app. File one fictitious claim, then follow it through the code.
 

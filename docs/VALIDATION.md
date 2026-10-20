@@ -1,6 +1,6 @@
 # Check your demo
 
-[Back to the README](../README.md) Â· [Deployment](DEPLOYMENT.md)
+[Back to the README](../README.md) · [Deployment](DEPLOYMENT.md)
 
 Check the whole workflow. A successful deployment or health response does not establish browser sign-in or agent access.
 

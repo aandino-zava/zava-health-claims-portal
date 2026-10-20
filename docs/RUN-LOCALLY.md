@@ -1,6 +1,6 @@
 # Run the demo on your computer
 
-[Back to the README](../README.md) Â· [Beginner's guide](BEGINNERS_GUIDE.md)
+[Back to the README](../README.md) · [Beginner's guide](BEGINNERS_GUIDE.md)
 
 Choose either option. Both use a local development identity with all three roles and require no Azure account. Use fictitious data only.
 

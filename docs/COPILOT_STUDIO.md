@@ -1,6 +1,6 @@
 # Connect Copilot Studio
 
-[API reference](API.md) Â· [Deploy your demo](DEPLOYMENT.md)
+[API reference](API.md) · [Deploy your demo](DEPLOYMENT.md)
 
 Configure the API connection and browser connection separately. Azure onboarding deploys the app; it does not create a Copilot Studio agent or connection.
 
@@ -27,7 +27,7 @@ The exporter derives seven operations and models from the application schema. CI
 
 ## 3. Import and authenticate
 
-In Copilot Studio, use **Tools â†’ Add tool â†’ New tool â†’ REST API** where available, or import the v2 file into a Power Platform custom connector. Select the operations your scenario needs. Follow Microsoft's [REST API tool guide](https://learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-rest-api) for the current import screens.
+In Copilot Studio, use **Tools → Add tool → New tool → REST API** where available, or import the v2 file into a Power Platform custom connector. Select the operations your scenario needs. Follow Microsoft's [REST API tool guide](https://learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-rest-api) for the current import screens.
 
 Configure OAuth 2.0 with the connector registration:
 

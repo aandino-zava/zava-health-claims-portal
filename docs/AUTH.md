@@ -2,6 +2,8 @@
 
 Create two single-tenant app registrations in the destination tenant. Use different client IDs for the API and the browser SPA. No browser client secret is needed.
 
+The [automated onboarding command](DEPLOYMENT.md#automated-onboarding) creates these registrations, grants SPA consent, assigns your demo roles, and configures the deployed redirect URI. The instructions below describe the equivalent manual configuration.
+
 ## API registration
 
 1. Set the application ID URI to `api://<API_CLIENT_ID>`.

@@ -6,19 +6,19 @@ from pathlib import Path
 
 
 def parameters(env, outputs=None):
-    hosting = env.get("AZURE_HOSTING", "containerapps")
+    hosting = env.get("AZURE_HOSTING", "appservice")
     if hosting not in {"containerapps", "appservice"}:
         raise ValueError("AZURE_HOSTING must be containerapps or appservice")
     params = {
-        "prefix": env["AZURE_PREFIX"], "location": env.get("AZURE_LOCATION", "eastus"),
+        "prefix": env["AZURE_PREFIX"], "location": env.get("AZURE_LOCATION", "centralus"),
         "databasePassword": env["DATABASE_ADMIN_PASSWORD"],
     }
     if outputs is None:
         params["hosting"] = hosting
         if hosting == "appservice" and env.get("AZURE_APPSERVICE_LOCATION"):
             params["appServiceLocation"] = env["AZURE_APPSERVICE_LOCATION"]
-        params["databaseSku"] = env.get("AZURE_POSTGRES_SKU", "Standard_B1ms")
-        params["databaseTier"] = env.get("AZURE_POSTGRES_TIER", "Burstable")
+        params["databaseSku"] = env.get("AZURE_POSTGRES_SKU", "Standard_D2ads_v5")
+        params["databaseTier"] = env.get("AZURE_POSTGRES_TIER", "GeneralPurpose")
         if env.get("AZURE_POSTGRES_SERVER_NAME"):
             params["databaseServerName"] = env["AZURE_POSTGRES_SERVER_NAME"]
         if env.get("AZURE_REGISTRY_NAME"):
@@ -84,7 +84,7 @@ def dry_run(env, folder, templates):
     # Do not consume real deployment outputs or persist the configured password.
     sample = dict(env, DATABASE_ADMIN_PASSWORD="ValidationOnly_123!", DATABASE_APP_PASSWORD="ValidationApp_123!", GITHUB_SHA=env.get("GITHUB_SHA", "validation-only"))
     documents = {"foundation": parameters(sample), "app": parameters(sample, fixture_outputs())}
-    app_template = "app-service" if sample.get("AZURE_HOSTING") == "appservice" else "app"
+    app_template = "app-service" if sample.get("AZURE_HOSTING", "appservice") == "appservice" else "app"
     for name, document in documents.items():
         template_name = "foundation" if name == "foundation" else app_template
         check_contract(document, json.loads((templates / f"{template_name}.json").read_text()))

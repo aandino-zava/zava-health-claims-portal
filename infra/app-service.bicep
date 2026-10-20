@@ -2,7 +2,7 @@ targetScope = 'resourceGroup'
 param prefix string
 @description('Optional explicit globally unique web app name. Keep stable after deployment.')
 param webAppName string = '${prefix}-${uniqueString(resourceGroup().id)}-portal'
-param location string = 'eastus'
+param location string = 'centralus'
 param identityId string
 param image string
 param databaseHost string

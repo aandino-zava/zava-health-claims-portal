@@ -115,7 +115,7 @@ def test_live_parameters_keep_contract(hosting):
     assert foundation == {k: {"value": v} for k, v in {
         "prefix": env["AZURE_PREFIX"], "location": "eastus", "databasePassword": env["DATABASE_ADMIN_PASSWORD"],
         "hosting": hosting,
-        "databaseSku": "Standard_B1ms", "databaseTier": "Burstable",
+        "databaseSku": "Standard_D2ads_v5", "databaseTier": "GeneralPurpose",
     }.items()}
     outputs = fixture_outputs()
     actual = parameters(env, outputs)["parameters"]
@@ -127,7 +127,7 @@ def test_live_parameters_keep_contract(hosting):
     assert actual["image"]["value"] == "validationonly.azurecr.io/health-claims-portal:test-commit"
 
 
-@pytest.mark.parametrize("hosting", ["containerapps", "appservice"])
+@pytest.mark.parametrize("hosting", ["containerapps", "appservice", None])
 def test_dry_run_cli_with_compiled_templates(tmp_path, hosting):
     templates = ROOT / "work/templates"
     if not templates.exists():
@@ -139,6 +139,9 @@ def test_dry_run_cli_with_compiled_templates(tmp_path, hosting):
     real = tmp_path / "work/foundation.outputs.json"
     real.write_text("do not consume")
     env = dict(os.environ, **runtime_config(hosting))
+    if hosting is None:
+        for key in ("AZURE_HOSTING", "AZURE_LOCATION", "AZURE_APPSERVICE_LOCATION"):
+            env.pop(key, None)
     result = subprocess.run([sys.executable, str(ROOT / "scripts/deployment_parameters.py"), "--dry-run"],
                             cwd=tmp_path, env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
@@ -149,6 +152,19 @@ def test_dry_run_cli_with_compiled_templates(tmp_path, hosting):
         assert env["DATABASE_ADMIN_PASSWORD"] not in body + result.stdout + result.stderr
         assert env["DATABASE_APP_PASSWORD"] not in body + result.stdout + result.stderr
         assert json.loads(body)["parameters"]["databasePassword"]["value"] == "ValidationOnly_123!"
+
+
+def test_omitted_deployment_options_select_single_region_app_service():
+    env = runtime_config("appservice")
+    for key in ("AZURE_HOSTING", "AZURE_LOCATION"):
+        env.pop(key)
+    foundation = parameters(env)["parameters"]
+    app = parameters(env, fixture_outputs())["parameters"]
+    assert foundation["hosting"]["value"] == "appservice"
+    assert foundation["location"] == app["location"] == {"value": "centralus"}
+    assert foundation["databaseSku"]["value"] == "Standard_D2ads_v5"
+    assert foundation["databaseTier"]["value"] == "GeneralPurpose"
+    assert "webSubnetId" in app and "environmentId" not in app
 
 
 def test_workflow_cloud_steps_are_gated():

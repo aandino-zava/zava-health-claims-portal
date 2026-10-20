@@ -20,24 +20,24 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: deploy-${{ inputs.environment || 'azure-demo' }}
+  group: deploy-${{ inputs.environment || 'zavaclaims' }}
   cancel-in-progress: false
 jobs:
   validate:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'azure-demo' }}
+    environment: ${{ inputs.environment || 'zavaclaims' }}
     env:
       AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       AZURE_DEPLOY_CLIENT_ID: ${{ vars.AZURE_DEPLOY_CLIENT_ID }}
       AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
-      AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'eastus' }}
-      AZURE_HOSTING: ${{ vars.AZURE_HOSTING || 'containerapps' }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'centralus' }}
+      AZURE_HOSTING: ${{ vars.AZURE_HOSTING || 'appservice' }}
       AZURE_APPSERVICE_SKU: ${{ vars.AZURE_APPSERVICE_SKU || 'B1' }}
-      AZURE_APPSERVICE_LOCATION: ${{ vars.AZURE_APPSERVICE_LOCATION || vars.AZURE_LOCATION || 'eastus' }}
+      AZURE_APPSERVICE_LOCATION: ${{ vars.AZURE_APPSERVICE_LOCATION || vars.AZURE_LOCATION || 'centralus' }}
       AZURE_PREFIX: ${{ vars.AZURE_PREFIX }}
-      AZURE_POSTGRES_SKU: ${{ vars.AZURE_POSTGRES_SKU || 'Standard_B1ms' }}
-      AZURE_POSTGRES_TIER: ${{ vars.AZURE_POSTGRES_TIER || 'Burstable' }}
+      AZURE_POSTGRES_SKU: ${{ vars.AZURE_POSTGRES_SKU || 'Standard_D2ads_v5' }}
+      AZURE_POSTGRES_TIER: ${{ vars.AZURE_POSTGRES_TIER || 'GeneralPurpose' }}
       AZURE_POSTGRES_SERVER_NAME: ${{ vars.AZURE_POSTGRES_SERVER_NAME }}
       AZURE_REGISTRY_NAME: ${{ vars.AZURE_REGISTRY_NAME }}
       AZURE_WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}
@@ -84,7 +84,7 @@ jobs:
     if: ${{ !inputs.dry_run }}
     needs: validate
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'azure-demo' }}
+    environment: ${{ inputs.environment || 'zavaclaims' }}
     permissions:
       contents: read
       id-token: write
@@ -93,13 +93,13 @@ jobs:
       AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       AZURE_DEPLOY_CLIENT_ID: ${{ vars.AZURE_DEPLOY_CLIENT_ID }}
       AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
-      AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'eastus' }}
-      AZURE_HOSTING: ${{ vars.AZURE_HOSTING || 'containerapps' }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'centralus' }}
+      AZURE_HOSTING: ${{ vars.AZURE_HOSTING || 'appservice' }}
       AZURE_APPSERVICE_SKU: ${{ vars.AZURE_APPSERVICE_SKU || 'B1' }}
-      AZURE_APPSERVICE_LOCATION: ${{ vars.AZURE_APPSERVICE_LOCATION || vars.AZURE_LOCATION || 'eastus' }}
+      AZURE_APPSERVICE_LOCATION: ${{ vars.AZURE_APPSERVICE_LOCATION || vars.AZURE_LOCATION || 'centralus' }}
       AZURE_PREFIX: ${{ vars.AZURE_PREFIX }}
-      AZURE_POSTGRES_SKU: ${{ vars.AZURE_POSTGRES_SKU || 'Standard_B1ms' }}
-      AZURE_POSTGRES_TIER: ${{ vars.AZURE_POSTGRES_TIER || 'Burstable' }}
+      AZURE_POSTGRES_SKU: ${{ vars.AZURE_POSTGRES_SKU || 'Standard_D2ads_v5' }}
+      AZURE_POSTGRES_TIER: ${{ vars.AZURE_POSTGRES_TIER || 'GeneralPurpose' }}
       AZURE_POSTGRES_SERVER_NAME: ${{ vars.AZURE_POSTGRES_SERVER_NAME }}
       AZURE_REGISTRY_NAME: ${{ vars.AZURE_REGISTRY_NAME }}
       AZURE_WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}

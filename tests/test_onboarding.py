@@ -36,9 +36,9 @@ def repo():
 
 
 def test_subject_is_observed_instead_of_inferred_from_repo_age():
-    assert onboarding.validate_claims(claims(), repo()) == claims()["sub"]
+    assert onboarding.validate_claims(claims(), repo(), "azure-demo") == claims()["sub"]
     legacy = dict(claims(), sub="repo:owner/claims:environment:azure-demo")
-    assert onboarding.validate_claims(legacy, repo()) == legacy["sub"]
+    assert onboarding.validate_claims(legacy, repo(), "azure-demo") == legacy["sub"]
 
 
 @pytest.mark.parametrize("key,value", [
@@ -49,7 +49,7 @@ def test_subject_is_observed_instead_of_inferred_from_repo_age():
 ])
 def test_rejects_mismatched_federation_context(key, value):
     with pytest.raises(RuntimeError):
-        onboarding.validate_claims(dict(claims(), **{key: value}), repo())
+        onboarding.validate_claims(dict(claims(), **{key: value}), repo(), "azure-demo")
 
 
 def test_selected_environment_cannot_reuse_another_environments_subject():
@@ -141,7 +141,7 @@ def test_app_service_preflight_does_not_require_container_network_feature(monkey
     def azure(*args):
         assert args[1] == "postgres"
         return [{"supportedServerVersions": [{"name": "16"}], "supportedServerEditions": [
-            {"name": "Burstable", "supportedServerSkus": [{"name": "Standard_B1ms"}]},
+            {"name": "GeneralPurpose", "supportedServerSkus": [{"name": "Standard_D2ads_v5"}]},
         ]}]
 
     monkeypatch.setattr(onboarding, "run", azure)
@@ -176,7 +176,7 @@ def test_readiness_checks_selected_database_size_instead_of_default(monkeypatch)
         ],
     }])
     onboarding.azure_readiness("eastus2", "appservice", "Standard_B2s", "Burstable")
-    with pytest.raises(RuntimeError, match="Standard_B1ms"):
+    with pytest.raises(RuntimeError, match="Standard_D2ads_v5"):
         onboarding.azure_readiness("eastus2", "appservice")
 
 

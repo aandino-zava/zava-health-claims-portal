@@ -28,20 +28,20 @@ def validate(env):
             errors.append(f"{key}: use a nonzero lowercase GUID in canonical hyphenated format.")
     if env.get("AZURE_PREFIX") and not re.fullmatch(r"[a-z][a-z0-9]{2,15}", env["AZURE_PREFIX"]):
         errors.append("AZURE_PREFIX: use 3-16 lowercase letters/digits, starting with a letter.")
-    if env.get("AZURE_HOSTING", "containerapps") not in {"containerapps", "appservice"}:
+    if env.get("AZURE_HOSTING", "appservice") not in {"containerapps", "appservice"}:
         errors.append("AZURE_HOSTING: choose containerapps or appservice.")
     if env.get("AZURE_APPSERVICE_SKU", "B1") not in {"B1", "B2", "B3", "S1", "S2", "S3", "P0v3", "P1v3", "P2v3", "P3v3"}:
         errors.append("AZURE_APPSERVICE_SKU: choose a supported Basic, Standard, or Premium v3 size.")
-    if not re.fullmatch(r"Standard_[A-Za-z0-9_]+", env.get("AZURE_POSTGRES_SKU", "Standard_B1ms")):
+    if not re.fullmatch(r"Standard_[A-Za-z0-9_]+", env.get("AZURE_POSTGRES_SKU", "Standard_D2ads_v5")):
         errors.append("AZURE_POSTGRES_SKU: use an Azure PostgreSQL SKU name such as Standard_B2s.")
-    if env.get("AZURE_POSTGRES_TIER", "Burstable") not in {"Burstable", "GeneralPurpose", "MemoryOptimized"}:
+    if env.get("AZURE_POSTGRES_TIER", "GeneralPurpose") not in {"Burstable", "GeneralPurpose", "MemoryOptimized"}:
         errors.append("AZURE_POSTGRES_TIER: choose Burstable, GeneralPurpose, or MemoryOptimized.")
     if env.get("AZURE_POSTGRES_SERVER_NAME") and not re.fullmatch(
         r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", env["AZURE_POSTGRES_SERVER_NAME"]
     ):
         errors.append("AZURE_POSTGRES_SERVER_NAME: use 3-63 lowercase letters/digits/hyphens, with alphanumeric ends.")
-    if not re.fullmatch(r"[a-z][a-z0-9]+", env.get("AZURE_LOCATION", "eastus")):
-        errors.append("AZURE_LOCATION: use a region code such as eastus, not a display name.")
+    if not re.fullmatch(r"[a-z][a-z0-9]+", env.get("AZURE_LOCATION", "centralus")):
+        errors.append("AZURE_LOCATION: use a region code such as centralus, not a display name.")
     if env.get("AZURE_APPSERVICE_LOCATION") and not re.fullmatch(r"[a-z][a-z0-9]+", env["AZURE_APPSERVICE_LOCATION"]):
         errors.append("AZURE_APPSERVICE_LOCATION: use a region code such as centralus.")
     if env.get("AZURE_REGISTRY_NAME") and not re.fullmatch(r"[a-z0-9]{5,50}", env["AZURE_REGISTRY_NAME"]):

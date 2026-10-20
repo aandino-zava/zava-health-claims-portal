@@ -205,7 +205,7 @@ def delegation_condition(runtime_principal):
     )
 
 
-def azure_readiness(location, hosting, database_sku="Standard_B1ms", database_tier="Burstable"):
+def azure_readiness(location, hosting, database_sku="Standard_D2ads_v5", database_tier="GeneralPurpose"):
     """Check service-advertised restrictions before creating billable infrastructure."""
     capabilities = run("az", "postgres", "flexible-server", "list-skus", "--location", location,
                        "--output", "json")
@@ -286,7 +286,7 @@ def workflow(repo, filename, title_prefix, inputs, timeout=7200):
     raise RuntimeError("Workflow is still pending. Inspect Actions before rerunning onboarding.")
 
 
-def validate_claims(claims, repo_info, environment="azure-demo"):
+def validate_claims(claims, repo_info, environment="zavaclaims"):
     expected = {"repository": repo_info["full_name"], "repository_id": str(repo_info["id"]),
                 "repository_owner_id": str(repo_info["owner"]["id"]), "environment": environment,
                 "ref": "refs/heads/main", "iss": "https://token.actions.githubusercontent.com",
@@ -298,7 +298,7 @@ def validate_claims(claims, repo_info, environment="azure-demo"):
     return claims["sub"]
 
 
-def discover_subject(repo, repo_info, environment="azure-demo"):
+def discover_subject(repo, repo_info, environment="zavaclaims"):
     run_id = workflow(repo, "oidc.yml", "OIDC discovery", {"environment": environment})
     logs = run("gh", "run", "view", str(run_id), "--repo", repo, "--log", raw=True)
     rows = [line.split("ONBOARDING_OIDC=", 1)[1] for line in logs.splitlines()
@@ -331,9 +331,9 @@ def main():
     parser.add_argument("--prefix", required=True)
     parser.add_argument("--environment", default="zavaclaims", help="GitHub deployment environment; each target has separate variables, secrets, and state")
     parser.add_argument("--state-file", help="Optional local onboarding state file")
-    parser.add_argument("--location", default="eastus")
-    parser.add_argument("--hosting", choices=("containerapps", "appservice"), default="containerapps")
-    parser.add_argument("--database-sku", help="PostgreSQL SKU; defaults to the environment setting or Standard_B1ms")
+    parser.add_argument("--location", default="centralus")
+    parser.add_argument("--hosting", choices=("containerapps", "appservice"), default="appservice")
+    parser.add_argument("--database-sku", help="PostgreSQL SKU; defaults to the environment setting or Standard_D2ads_v5")
     parser.add_argument("--database-tier", choices=("Burstable", "GeneralPurpose", "MemoryOptimized"))
     parser.add_argument("--database-server-name", help="Explicit name for a deliberately new PostgreSQL server")
     parser.add_argument("--appservice-sku", choices=APPSERVICE_SKUS)
@@ -382,8 +382,8 @@ def main():
         }})
         gh(environment_path + "/deployment-branch-policies", "POST", {"name": "main", "type": "branch"})
     current = {item["name"]: item["value"] for item in gh(variables_path + "?per_page=100")["variables"]}
-    database_sku = args.database_sku or current.get("AZURE_POSTGRES_SKU", "Standard_B1ms")
-    database_tier = args.database_tier or current.get("AZURE_POSTGRES_TIER", "Burstable")
+    database_sku = args.database_sku or current.get("AZURE_POSTGRES_SKU", "Standard_D2ads_v5")
+    database_tier = args.database_tier or current.get("AZURE_POSTGRES_TIER", "GeneralPurpose")
     database_name = args.database_server_name or current.get("AZURE_POSTGRES_SERVER_NAME")
     appservice_sku = args.appservice_sku or current.get("AZURE_APPSERVICE_SKU", "B1")
     appservice_location = args.appservice_location or current.get("AZURE_APPSERVICE_LOCATION") or args.location

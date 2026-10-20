@@ -13,6 +13,8 @@ param databaseUser string = 'claimsadmin'
 param databaseSku string = 'Standard_B1ms'
 @allowed(['Burstable', 'GeneralPurpose', 'MemoryOptimized'])
 param databaseTier string = 'Burstable'
+@description('Stable PostgreSQL server name. Override only for a deliberately new database.')
+param databaseServerName string = '${prefix}-${uniqueString(resourceGroup().id)}-pg'
 
 var suffix = uniqueString(resourceGroup().id)
 var registryName = '${prefix}${suffix}'
@@ -77,7 +79,7 @@ resource dnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-
   properties: { registrationEnabled: false, virtualNetwork: { id: network.id } }
 }
 resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
-  name: '${prefix}-${suffix}-pg'
+  name: databaseServerName
   location: location
   sku: { name: databaseSku, tier: databaseTier }
   properties: {

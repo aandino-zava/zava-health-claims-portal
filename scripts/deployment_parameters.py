@@ -17,6 +17,8 @@ def parameters(env, outputs=None):
         params["hosting"] = hosting
         params["databaseSku"] = env.get("AZURE_POSTGRES_SKU", "Standard_B1ms")
         params["databaseTier"] = env.get("AZURE_POSTGRES_TIER", "Burstable")
+        if env.get("AZURE_POSTGRES_SERVER_NAME"):
+            params["databaseServerName"] = env["AZURE_POSTGRES_SERVER_NAME"]
     else:
         keys = (("identityId", "databaseHost", "webSubnetId", "logsWorkspaceId") if hosting == "appservice"
                 else ("environmentId", "identityId", "registryServer", "databaseHost"))

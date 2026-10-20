@@ -180,3 +180,12 @@ def test_database_capacity_override_is_passed_to_foundation():
     assert result["databaseTier"]["value"] == "Burstable"
     assert validate(dict(config(), AZURE_POSTGRES_SKU="invalid"))
     assert validate(dict(config(), AZURE_POSTGRES_TIER="invalid"))
+
+
+def test_explicit_server_name_is_stable_and_optional():
+    env = runtime_config("appservice")
+    assert "databaseServerName" not in parameters(env)["parameters"]
+    env["AZURE_POSTGRES_SERVER_NAME"] = "claims-recovery-db"
+    assert parameters(env)["parameters"]["databaseServerName"]["value"] == "claims-recovery-db"
+    assert validate(dict(config(), AZURE_POSTGRES_SERVER_NAME="claims-recovery-db")) == []
+    assert validate(dict(config(), AZURE_POSTGRES_SERVER_NAME="BAD_NAME"))

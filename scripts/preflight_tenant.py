@@ -34,6 +34,10 @@ def validate(env):
         errors.append("AZURE_POSTGRES_SKU: use an Azure PostgreSQL SKU name such as Standard_B2s.")
     if env.get("AZURE_POSTGRES_TIER", "Burstable") not in {"Burstable", "GeneralPurpose", "MemoryOptimized"}:
         errors.append("AZURE_POSTGRES_TIER: choose Burstable, GeneralPurpose, or MemoryOptimized.")
+    if env.get("AZURE_POSTGRES_SERVER_NAME") and not re.fullmatch(
+        r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", env["AZURE_POSTGRES_SERVER_NAME"]
+    ):
+        errors.append("AZURE_POSTGRES_SERVER_NAME: use 3-63 lowercase letters/digits/hyphens, with alphanumeric ends.")
     if not re.fullmatch(r"[a-z][a-z0-9]+", env.get("AZURE_LOCATION", "eastus")):
         errors.append("AZURE_LOCATION: use a region code such as eastus, not a display name.")
     group = env.get("AZURE_RESOURCE_GROUP", "")

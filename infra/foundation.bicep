@@ -4,17 +4,17 @@ targetScope = 'resourceGroup'
 @minLength(3)
 @maxLength(16)
 param prefix string
-param location string = 'eastus'
+param location string = 'centralus'
 @description('App Service region; a different region creates a peered web VNet without moving the database.')
 param appServiceLocation string = location
 @allowed(['containerapps', 'appservice'])
-param hosting string = 'containerapps'
+param hosting string = 'appservice'
 @secure()
 param databasePassword string
 param databaseUser string = 'claimsadmin'
-param databaseSku string = 'Standard_B1ms'
+param databaseSku string = 'Standard_D2ads_v5'
 @allowed(['Burstable', 'GeneralPurpose', 'MemoryOptimized'])
-param databaseTier string = 'Burstable'
+param databaseTier string = 'GeneralPurpose'
 @description('Stable PostgreSQL server name. Override only for a deliberately new database.')
 param databaseServerName string = '${prefix}-${uniqueString(resourceGroup().id)}-pg'
 @description('Optional explicit globally unique registry name. Keep stable after deployment.')

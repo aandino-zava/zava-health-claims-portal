@@ -4,7 +4,7 @@
 
 Use automated onboarding for a new tenant. Use the GitHub deployment workflow for later releases.
 
-## Working Zava setup
+## Zava deployment
 
 | Component | Configuration |
 | --- | --- |
@@ -71,11 +71,11 @@ Open the reported URL, sign in, submit a fictitious claim, and reload. Follow [C
 
 For readable global resource names, use `--registry-name`, `--webapp-name`, and `--database-server-name`. Zava uses the names shown above. Choose available names for your own deployment and keep them stable across releases.
 
-- **Redeploy:** wait for CI to pass, select the intended environment (`zavaclaims` for the replacement), then run **Actions → Deploy Azure demo → Run workflow** on `main`. Leave `dry_run` checked for offline validation; uncheck it to deploy. Offline validation does not log in to Azure or prove capacity, policy, or sign-in.
-- **Retry setup:** rerun the same onboarding command. Ignored `work/onboarding-zavaclaims.json` holds identifiers and workflow IDs, never passwords or tokens. Other environment names get separate state files; the previous `azure-demo` keeps its original state. Configured registrations are reused even if their display names have an older prefix.
+- **Redeploy:** wait for CI to pass, select the intended environment (`zavaclaims` for Zava), then run **Actions → Deploy Azure demo → Run workflow** on `main`. Leave `dry_run` checked for offline validation; uncheck it to deploy. Offline validation does not log in to Azure or prove capacity, policy, or sign-in.
+- **Retry setup:** rerun the same onboarding command. Ignored `work/onboarding-zavaclaims.json` holds identifiers and workflow IDs, never passwords or tokens. Other environment names get separate state files. Configured registrations are reused.
 - **Finish the redirect:** if deployment succeeded but administrator sign-in expired, rerun the same command with `--finalize` instead of `--deploy`. It reads the existing deployment URL without redeploying. Use this after a manual deployment creates a new host too.
 
-Keep the prefix, foundation region, and database name stable once data is stored. In Zava, `AZURE_POSTGRES_SERVER_NAME` is `zavaclaims-pg`; routine releases preserve it. Changing a region or server name does not migrate data. The workflow does not delete resources from an earlier hosting choice.
+Keep the prefix, foundation region, and database name stable once data is stored. In Zava, `AZURE_POSTGRES_SERVER_NAME` is `zavaclaims-pg`; routine releases preserve it. Changing a region or server name does not migrate data. Deployment does not remove existing resources.
 
 | Azure reports | Next step |
 | --- | --- |
@@ -85,7 +85,7 @@ Keep the prefix, foundation region, and database name stable once data is stored
 | A failed, empty server's name remains reserved | Use `--database-server-name` for a deliberately new server. Keep populated databases on their existing name. |
 | Container Apps network approval is pending | Resolve the approval or select App Service before deployment. |
 
-Live preflight checks advertised PostgreSQL availability, known Container Apps restrictions, and native App Service plan validation. It does not automatically choose regions/SKUs or override policy. Advertised capacity can still fail during provisioning. Pass the region and hosting flags shown above; the CLI retains its earlier Container Apps/East US defaults for compatibility.
+Live preflight checks advertised PostgreSQL availability, known Container Apps restrictions, and native App Service plan validation. It does not automatically choose regions/SKUs or override policy. Advertised capacity can still fail during provisioning. Defaults match Zava: Central US, App Service B1, and General Purpose PostgreSQL. Explicit environment settings and CLI options override them.
 
 ## Manual setup reference
 
@@ -128,4 +128,4 @@ Defaults are 64 KiB per request body and 120 API requests/minute per client addr
 
 For rollback, redeploy a known-good image/commit after checking schema compatibility; database downgrade is not automatic. To retire the demo, preserve any required test data before removing its dedicated resources. Deployment workflows do not perform cleanup.
 
-The Central US replacement shares the three Entra registrations with the previous Zava deployment. Keep those registrations when retiring the previous resource group.
+Keep shared Entra registrations when retiring a resource group that no longer hosts the app.

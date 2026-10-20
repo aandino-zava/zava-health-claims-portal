@@ -17,7 +17,7 @@ permissions:
 jobs:
   discover:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'azure-demo' }}
+    environment: ${{ inputs.environment || 'zavaclaims' }}
     permissions:
       contents: read
       id-token: write

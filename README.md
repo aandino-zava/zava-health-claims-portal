@@ -2,7 +2,7 @@
 
 A web app and REST API for agentic AI demos. Submit synthetic claims, track their progress, record reviewer updates, and let an authorized agent work through the same API.
 
-![Health Claims Portal dashboard](docs/dashboard.jpg)
+![Health Claims Portal dashboard](docs/dashboard.png)
 
 ## Start here
 
@@ -24,9 +24,9 @@ docker compose up --build
 
 Open **http://127.0.0.1:8000**. The app loads eight fictitious claims and a local demo identity. No Azure account or AI model is required. The [local guide](docs/RUN-LOCALLY.md) also covers Python and saved data.
 
-## Working Azure setup
+## Zava deployment
 
-The Zava demo runs in **Central US**: Linux App Service B1, private PostgreSQL 16, Container Registry, runtime identity, and Log Analytics. One VNet and private DNS connect the app and database in `rg-health-claims-portal-demo`.
+The **zavaclaims** demo runs in **Central US**: Linux App Service B1, private PostgreSQL 16, Container Registry, runtime identity, and Log Analytics. One VNet and private DNS connect the app and database in `rg-health-claims-portal-demo`.
 
 [Open the Zava portal](https://zavaclaims-portal.azurewebsites.net/) with an assigned Zava work account. Sign-in, synthetic claim submission, and persistence after reload were verified on October 20, 2026.
 

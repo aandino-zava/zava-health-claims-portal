@@ -1,6 +1,6 @@
 targetScope = 'resourceGroup'
 param prefix string
-param location string = 'eastus'
+param location string = 'centralus'
 param environmentId string
 param identityId string
 param registryServer string

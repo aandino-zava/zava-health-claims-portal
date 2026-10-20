@@ -71,6 +71,7 @@ Create a GitHub environment named `azure-demo`. If you restrict deployment branc
 | AZURE_LOCATION | `eastus` unless overridden |
 | AZURE_HOSTING | `containerapps` (default) or `appservice`; choose before initial deployment |
 | AZURE_APPSERVICE_SKU | Optional App Service size; default `B1`, or a supported Standard/Premium v3 size with available quota |
+| AZURE_APPSERVICE_LOCATION | Optional web hosting region; defaults to AZURE_LOCATION. A different region creates a peered web VNet and a private DNS link while retaining the database in AZURE_LOCATION. |
 | AZURE_PREFIX | Unique deployment prefix, e.g. `claimsdev` |
 | AZURE_POSTGRES_SKU | Optional database size; default `Standard_B1ms`, e.g. `Standard_B2s` where B1ms is unavailable |
 | AZURE_POSTGRES_TIER | Optional `Burstable` (default), `GeneralPurpose`, or `MemoryOptimized`; must match the size |

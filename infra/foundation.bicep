@@ -5,6 +5,8 @@ targetScope = 'resourceGroup'
 @maxLength(16)
 param prefix string
 param location string = 'eastus'
+@description('App Service region; a different region creates a peered web VNet without moving the database.')
+param appServiceLocation string = location
 @allowed(['containerapps', 'appservice'])
 param hosting string = 'containerapps'
 @secure()
@@ -18,6 +20,7 @@ param databaseServerName string = '${prefix}-${uniqueString(resourceGroup().id)}
 
 var suffix = uniqueString(resourceGroup().id)
 var registryName = '${prefix}${suffix}'
+var separateWebRegion = hosting == 'appservice' && appServiceLocation != location
 
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: registryName
@@ -72,6 +75,42 @@ resource dns 'Microsoft.Network/privateDnsZones@2020-06-01' = {
   name: '${prefix}.private.postgres.database.azure.com'
   location: 'global'
 }
+resource webNetwork 'Microsoft.Network/virtualNetworks@2023-11-01' = if (separateWebRegion) {
+  name: '${prefix}-web-vnet'
+  location: appServiceLocation
+  properties: {
+    addressSpace: { addressPrefixes: ['10.73.0.0/16'] }
+    subnets: [{
+      name: 'web'
+      properties: {
+        addressPrefix: '10.73.3.0/24'
+        delegations: [{ name: 'appservice', properties: { serviceName: 'Microsoft.Web/serverFarms' } }]
+      }
+    }]
+  }
+}
+resource webToDatabase 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2023-11-01' = if (separateWebRegion) {
+  parent: webNetwork
+  name: 'to-database'
+  properties: {
+    remoteVirtualNetwork: { id: network.id }
+    allowVirtualNetworkAccess: true
+  }
+}
+resource databaseToWeb 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2023-11-01' = if (separateWebRegion) {
+  parent: network
+  name: 'to-web'
+  properties: {
+    remoteVirtualNetwork: { id: webNetwork!.id }
+    allowVirtualNetworkAccess: true
+  }
+}
+resource webDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = if (separateWebRegion) {
+  parent: dns
+  name: '${prefix}-web-link'
+  location: 'global'
+  properties: { registrationEnabled: false, virtualNetwork: { id: webNetwork!.id } }
+}
 resource dnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
   parent: dns
   name: '${prefix}-link'
@@ -125,7 +164,7 @@ resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = if (hostin
 output registryName string = registry.name
 output registryServer string = registry.properties.loginServer
 output environmentId string = hosting == 'containerapps' ? environment!.id : ''
-output webSubnetId string = '${network.id}/subnets/web'
+output webSubnetId string = separateWebRegion ? '${webNetwork!.id}/subnets/web' : '${network.id}/subnets/web'
 output identityId string = identity.id
 output databaseHost string = postgres.properties.fullyQualifiedDomainName
 output logsWorkspaceId string = logs.id

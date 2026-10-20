@@ -15,6 +15,8 @@ def parameters(env, outputs=None):
     }
     if outputs is None:
         params["hosting"] = hosting
+        if hosting == "appservice" and env.get("AZURE_APPSERVICE_LOCATION"):
+            params["appServiceLocation"] = env["AZURE_APPSERVICE_LOCATION"]
         params["databaseSku"] = env.get("AZURE_POSTGRES_SKU", "Standard_B1ms")
         params["databaseTier"] = env.get("AZURE_POSTGRES_TIER", "Burstable")
         if env.get("AZURE_POSTGRES_SERVER_NAME"):
@@ -26,6 +28,7 @@ def parameters(env, outputs=None):
             params[key] = outputs[key]["value"]
         if hosting == "appservice":
             params["appServiceSku"] = env.get("AZURE_APPSERVICE_SKU", "B1")
+            params["location"] = env.get("AZURE_APPSERVICE_LOCATION") or params["location"]
         params.update(
             appDatabasePassword=env["DATABASE_APP_PASSWORD"],
             seedDemo=env.get("SEED_DEMO", "true").lower() == "true",

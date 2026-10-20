@@ -329,6 +329,7 @@ def main():
     parser.add_argument("--database-tier", choices=("Burstable", "GeneralPurpose", "MemoryOptimized"))
     parser.add_argument("--database-server-name", help="Explicit name for a deliberately new PostgreSQL server")
     parser.add_argument("--appservice-sku", choices=APPSERVICE_SKUS)
+    parser.add_argument("--appservice-location", help="Optional App Service region; retains the database in --location")
     parser.add_argument("--employee", help="Employee object ID; defaults to the signed-in administrator")
     parser.add_argument("--deploy", action="store_true", help="Validate, deploy billable resources, and set redirect")
     parser.add_argument("--finalize", action="store_true", help="Set redirect from the existing claims-app deployment")
@@ -373,6 +374,9 @@ def main():
     database_tier = args.database_tier or current.get("AZURE_POSTGRES_TIER", "Burstable")
     database_name = args.database_server_name or current.get("AZURE_POSTGRES_SERVER_NAME")
     appservice_sku = args.appservice_sku or current.get("AZURE_APPSERVICE_SKU", "B1")
+    appservice_location = args.appservice_location or current.get("AZURE_APPSERVICE_LOCATION") or args.location
+    if not re.fullmatch(r"[a-z][a-z0-9]+", appservice_location):
+        raise RuntimeError("Invalid App Service region code.")
     if database_name and not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", database_name):
         raise RuntimeError("Invalid PostgreSQL server name.")
     if not re.fullmatch(r"Standard_[A-Za-z0-9_]+", database_sku):
@@ -380,7 +384,7 @@ def main():
     if args.deploy:
         azure_readiness(args.location, args.hosting, database_sku, database_tier)
         if args.hosting == "appservice":
-            validate_appservice_plan(args.location, appservice_sku, args.resource_group, args.prefix)
+            validate_appservice_plan(appservice_location, appservice_sku, args.resource_group, args.prefix)
     for key, expected in {"AZURE_TENANT_ID": args.tenant, "AZURE_SUBSCRIPTION_ID": args.subscription,
                           "AZURE_PREFIX": args.prefix, "AZURE_HOSTING": args.hosting,
                           "AZURE_RESOURCE_GROUP": args.resource_group}.items():
@@ -406,6 +410,7 @@ def main():
                  "AZURE_LOCATION": args.location, "AZURE_HOSTING": args.hosting, "AZURE_PREFIX": args.prefix,
                  "AZURE_POSTGRES_SKU": database_sku, "AZURE_POSTGRES_TIER": database_tier,
                  "AZURE_APPSERVICE_SKU": appservice_sku,
+                 "AZURE_APPSERVICE_LOCATION": appservice_location,
                  "ENTRA_API_CLIENT_ID": api["appId"], "ENTRA_SPA_CLIENT_ID": spa["appId"],
                  "ENTRA_ALLOWED_CLIENT_IDS": spa["appId"], "SEED_DEMO": "true"}
     if database_name:

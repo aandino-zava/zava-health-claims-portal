@@ -113,3 +113,24 @@ def test_app_service_preflight_does_not_require_container_network_feature(monkey
 
     monkeypatch.setattr(onboarding, "run", azure)
     onboarding.azure_readiness("eastus2", "appservice")
+
+
+def test_configured_registration_is_reused_after_infrastructure_prefix_change(monkeypatch):
+    client = "11111111-1111-4111-8111-111111111111"
+    app = {"id": "original-registration", "appId": client, "displayName": "original-claims-api"}
+    expressions = []
+
+    def lookup(path):
+        expressions.append(path)
+        return [app]
+
+    monkeypatch.setattr(onboarding, "all_graph", lookup)
+    assert onboarding.application("newprefix-claims-api", client) == app
+    assert "appId%20eq" in expressions[0]
+    assert "displayName" not in expressions[0]
+
+
+def test_missing_configured_registration_never_creates_replacement(monkeypatch):
+    monkeypatch.setattr(onboarding, "all_graph", lambda path: [])
+    with pytest.raises(RuntimeError, match="not found"):
+        onboarding.application("newprefix-claims-api", "11111111-1111-4111-8111-111111111111")

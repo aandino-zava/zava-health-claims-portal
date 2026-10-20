@@ -26,9 +26,9 @@ Open **http://127.0.0.1:8000**. The app loads eight fictitious claims and a loca
 
 ## Working Azure setup
 
-The Zava demo uses **Linux App Service B1 in Central US** and **private PostgreSQL 16 in East US 2**. Peered virtual networks and private DNS connect the two regions. The registry, runtime identity, and Log Analytics workspace are in East US 2.
+The Zava demo runs in **Central US**: Linux App Service B1, private PostgreSQL 16, Container Registry, runtime identity, and Log Analytics. One VNet and private DNS connect the app and database in `rg-health-claims-portal-demo`.
 
-[Open the Zava portal](https://zavaclaims2-hva6m7czoavik-portal.azurewebsites.net/) with an assigned Zava work account. Sign-in, synthetic claim submission, and persistence after reload were verified on October 20, 2026.
+[Open the Zava portal](https://zavaclaims-portal.azurewebsites.net/) with an assigned Zava work account. Sign-in, synthetic claim submission, and persistence after reload were verified on October 20, 2026.
 
 For your own tenant, the [onboarding command](docs/DEPLOYMENT.md#automated-onboarding) creates the three Entra registrations, permissions, GitHub OIDC connection, environment settings, and database secrets. With `--deploy`, it also deploys the app and sets the SPA redirect URL. Initial administrator sign-ins are required; Azure capacity and tenant policies still apply.
 

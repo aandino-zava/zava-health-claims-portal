@@ -17,7 +17,7 @@ FastAPI serves both the browser files and REST API. Python owns the claim rules;
 | --- | --- | --- | --- |
 | Local PowerShell | SQLite file by default | Development identity | Localhost |
 | Docker Compose | PostgreSQL named volume | Development identity | Local containers |
-| Zava Azure demo | Private PostgreSQL 16, East US 2 | Microsoft Entra | App Service B1, Central US |
+| Zava Azure demo | Private PostgreSQL 16, Central US | Microsoft Entra | App Service B1, Central US |
 
 The database file or volume must be retained for local data to survive restarts. Azure stores claims in PostgreSQL independently of the app container.
 
@@ -26,23 +26,21 @@ The database file or volume must be retained for local data to survive restarts.
 ```mermaid
 flowchart LR
   Setup[Administrator onboarding] --> Identity[Entra registrations and permissions]
-  Setup --> GitHub[GitHub azure-demo and OIDC]
+  Setup --> GitHub[GitHub zavaclaims and OIDC]
   GitHub --> Deploy[Bicep deployment and ACR image build]
   subgraph CentralUS[Central US]
-    App[App Service B1 and web VNet]
-  end
-  subgraph EastUS2[East US 2]
-    DB[(Private PostgreSQL 16 and database VNet)]
+    App[App Service B1]
+    DB[(Private PostgreSQL 16)]
     Shared[Registry, runtime identity, Log Analytics]
   end
   Deploy --> App
   Deploy --> DB
   Deploy --> Shared
-  App -->|VNet peering and private DNS| DB
+  App -->|Same VNet and private DNS| DB
   Shared -->|Managed identity image pull| App
 ```
 
-The verified Zava profile keeps the database and shared services in East US 2 and uses available App Service capacity in Central US. [Onboarding](DEPLOYMENT.md#automated-onboarding) creates the identities and GitHub settings, runs validation/deployment, then uses the administrator session to set the SPA redirect URL.
+The verified Zava profile keeps all regional services in Central US, in `rg-health-claims-portal-demo`. A single VNet has separate database and web subnets; no cross-region peering is required. [Onboarding](DEPLOYMENT.md#automated-onboarding) creates the identities and GitHub settings, runs validation/deployment, then uses the administrator session to set the SPA redirect URL.
 
 | Source | Responsibility |
 | --- | --- |

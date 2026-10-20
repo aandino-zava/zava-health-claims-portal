@@ -20,19 +20,17 @@ The [CI workflow](../.github/workflows/ci.yml) also verifies that bootstrap cred
 
 ## Verified in Zava
 
-On October 20, 2026, the [Azure deployment](https://github.com/aandino-zava/zava-health-claims-portal/actions/runs/39369414180) succeeded with App Service B1 in Central US and private PostgreSQL 16 in East US 2. The following checks passed:
+On October 20, 2026, the [replacement deployment](https://github.com/aandino-zava/zava-health-claims-portal/actions/runs/39373124270) succeeded in `rg-health-claims-portal-demo`. App Service B1, private PostgreSQL 16, registry, runtime identity, and logs all run in Central US. The deployment uses one VNet, no cross-region peering, and stable `zavaclaims` names.
 
-- Database readiness and Entra tenant/SPA configuration.
-- HTTP 401 for an unauthenticated `/api/v1/claims` request.
-- Work-account browser sign-in and loading the eight seeded claims.
-- Submission of a fictitious claim and retrieval of that same claim after a full page reload.
-- Stored claim details and the reviewer controls were visible.
-
-The unused East US VNet and three security groups were removed afterward. Live readiness, the three Entra registrations, and the current/rollback images were verified intact.
+- Full onboarding created the separate `zavaclaims` GitHub environment, its OIDC trust, deployment settings, and database secrets; existing Entra registrations were reused.
+- The deployment passed database readiness and configured the new SPA redirect URL automatically.
+- Work-account sign-in, reading seeded claims, synthetic claim submission, and persistence after a full reload passed in the replacement portal.
+- The app was verified to use the new private database and web subnet.
+- Previous Azure resources were preserved. Its GitHub environment, existing registration permissions/redirect, and current/rollback images were verified intact.
 
 ## Still to verify
 
-Reader-only and unassigned-user isolation, a live reviewer status update, sign-out, and Log Analytics event delivery need scenario checks in the target environment. Copilot Studio/Foundry import, authentication, orchestration, and computer use remain unverified. A clean onboarding run against a second tenant has not been performed.
+Reader-only and unassigned-user isolation, a live reviewer status update, sign-out, and Log Analytics event delivery need scenario checks in the target environment. Copilot Studio/Foundry import, authentication, orchestration, and computer use remain unverified. The replacement completed a clean onboarding run in the same tenant. Onboarding against a second tenant has not been tested.
 
 Load, failover, backup recovery, and a complete automated browser sign-in suite are outside the current evidence.
 

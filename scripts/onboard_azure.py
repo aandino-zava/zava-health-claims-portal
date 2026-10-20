@@ -21,11 +21,10 @@ CONTRIBUTOR = "b24988ac-6180-42a0-ab88-20f7382dd24c"
 RBAC_ADMIN = "f58310d9-a9f6-439a-9e8d-f62e7b41a168"
 ACR_PULL = "7f951dda-4ed3-4680-a7ca-43fe172d538d"
 STATE = Path("work/onboarding-state.json")
-APPSERVICE_CORES = {"B1": 1, "B2": 2, "B3": 4, "S1": 1, "S2": 2, "S3": 4,
-                    "P0v3": 1, "P1v3": 2, "P2v3": 4, "P3v3": 8}
+APPSERVICE_SKUS = ("B1", "B2", "B3", "S1", "S2", "S3", "P0v3", "P1v3", "P2v3", "P3v3")
 
 
-def run(*args, body=None, raw=False):
+def run(*args, body=None, raw=False, public_errors=False):
     """Use stdin for GitHub JSON/secrets; never echo command arguments or input."""
     executable = shutil.which(args[0])
     if not executable:
@@ -42,6 +41,9 @@ def run(*args, body=None, raw=False):
                             capture_output=True, text=True, encoding="utf-8")
     if result.returncode:
         # CLI errors can contain submitted bodies: surface the operation, not its input.
+        if public_errors:
+            # Opt in only for operations whose complete input contains no credentials.
+            raise RuntimeError(result.stderr.strip() or "Public configuration validation failed.")
         raise RuntimeError(f"{args[0]} {' '.join(args[1:3])} failed (exit {result.returncode}). "
                            "Check account privileges and the corresponding service operation.")
     if raw:
@@ -227,27 +229,25 @@ def azure_readiness(location, hosting, database_sku="Standard_B1ms", database_ti
     print(f"Azure advertises PostgreSQL 16 / {database_sku} in {location}; no checked blocker found.", flush=True)
 
 
-def appservice_quota_error(usages, sku):
-    tier = "Basic" if sku.startswith("B") else "Standard" if sku.startswith("S") else "Premium v3"
-    matches = [entry for entry in usages if entry.get("name", {}).get("localizedValue") == tier]
-    if matches and any(entry.get("limit", 0) - entry.get("currentValue", 0) < APPSERVICE_CORES[sku]
-                       for entry in matches):
-        return f"App Service {tier} quota is insufficient for {sku} in this region. Select an available tier or request quota."
-    return None
-
-
-def appservice_readiness(location, sku):
-    if sku not in APPSERVICE_CORES:
+def validate_appservice_plan(location, sku, resource_group, prefix):
+    if sku not in APPSERVICE_SKUS:
         raise RuntimeError("Unsupported App Service size; check AZURE_APPSERVICE_SKU.")
-    subscription = run("az", "account", "show", "--query", "id", "--output", "json")
-    url = (f"https://management.azure.com/subscriptions/{subscription}/providers/Microsoft.Web/"
-           f"locations/{location}/usages?api-version=2023-12-01")
-    result = run("az", "rest", "--method", "get", "--url", url,
-                 "--headers", "Accept-Language=en-US", "--output", "json")
-    error = appservice_quota_error(result["value"], sku)
-    if error:
-        raise RuntimeError(error)
-    print(f"No reported App Service quota blocker for {sku} in {location}.", flush=True)
+    tier = "Basic" if sku.startswith("B") else "Standard" if sku.startswith("S") else "PremiumV3"
+    template = {"$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                "contentVersion": "1.0.0.0", "resources": [{
+                    "type": "Microsoft.Web/serverfarms", "apiVersion": "2023-12-01",
+                    "name": prefix + "-plan", "location": location, "kind": "linux",
+                    "sku": {"name": sku, "tier": tier, "capacity": 1}, "properties": {"reserved": True},
+                }]}
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "plan.json"
+        path.write_text(json.dumps(template), encoding="utf-8")
+        # ARM provider validation catches per-SKU VM quotas the summary endpoint can omit.
+        # This template has no secrets and provisions no resources; RG Contributor is sufficient.
+        run("az", "deployment", "group", "validate", "--resource-group", resource_group,
+            "--name", "claims-plan-preflight", "--template-file", str(path), "--output", "none",
+            public_errors=True)
+    print(f"App Service {sku} passed ARM plan validation in {location}.", flush=True)
 
 
 def workflow(repo, filename, title_prefix, inputs, timeout=7200):
@@ -328,7 +328,7 @@ def main():
     parser.add_argument("--database-sku", help="PostgreSQL SKU; defaults to the environment setting or Standard_B1ms")
     parser.add_argument("--database-tier", choices=("Burstable", "GeneralPurpose", "MemoryOptimized"))
     parser.add_argument("--database-server-name", help="Explicit name for a deliberately new PostgreSQL server")
-    parser.add_argument("--appservice-sku", choices=tuple(APPSERVICE_CORES))
+    parser.add_argument("--appservice-sku", choices=APPSERVICE_SKUS)
     parser.add_argument("--employee", help="Employee object ID; defaults to the signed-in administrator")
     parser.add_argument("--deploy", action="store_true", help="Validate, deploy billable resources, and set redirect")
     parser.add_argument("--finalize", action="store_true", help="Set redirect from the existing claims-app deployment")
@@ -380,7 +380,7 @@ def main():
     if args.deploy:
         azure_readiness(args.location, args.hosting, database_sku, database_tier)
         if args.hosting == "appservice":
-            appservice_readiness(args.location, appservice_sku)
+            validate_appservice_plan(args.location, appservice_sku, args.resource_group, args.prefix)
     for key, expected in {"AZURE_TENANT_ID": args.tenant, "AZURE_SUBSCRIPTION_ID": args.subscription,
                           "AZURE_PREFIX": args.prefix, "AZURE_HOSTING": args.hosting,
                           "AZURE_RESOURCE_GROUP": args.resource_group}.items():

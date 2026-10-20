@@ -27,7 +27,9 @@ If Azure rejects the default database size with `SkuNotAvailable`, select an ava
 
 Failed server creation can leave a name reserved after its ARM resource disappears. For an empty environment only, use `--database-server-name <fresh-unique-name>` to deliberately create a new server. The name is saved for later releases. Changing this setting in a populated environment creates a different database; it does not migrate existing claims. Keep the selected name stable once data is stored.
 
-App Service defaults to B1. If your subscription has zero quota for Basic, select a permitted size with `--appservice-sku P0v3`, for example. Onboarding checks the administrator's regional quota response before provisioning; the deployment identity retains its resource-group scope. A higher hosting tier changes ongoing costs. Supported sizes are B1-B3, S1-S3, and P0v3-P3v3.
+App Service defaults to B1. If your subscription has zero quota for Basic, select a permitted size with `--appservice-sku P0v3`, for example, and require successful ARM validation. The deployment identity retains its resource-group scope. A higher hosting tier changes ongoing costs. Supported sizes are B1-B3, S1-S3, and P0v3-P3v3.
+
+Both onboarding and real GitHub deployments also submit a small, secret-free App Service plan template to ARM **validation only** before provisioning. This catches per-size VM quotas that the regional usage summary can misrepresent. It creates no hosting resources and uses the deployment identity's existing resource-group permissions. If validation reports a VM quota of zero, request at least one instance of the selected size through Azure support before rerunning deployment. Selecting a larger size is not a substitute for a successful native validation.
 
 The command:
 

@@ -2,130 +2,122 @@
 
 [Back to the README](../README.md)
 
-For the fastest local trial, use [Docker Compose](RUN-LOCALLY.md). Follow this guide when you need a hosted API for your agentic demo.
+Use automated onboarding for a new tenant. Use the GitHub deployment workflow for later releases.
 
-## Deployment path
+## Working Zava setup
 
-1. Fork or copy this repository into your GitHub account.
-2. Choose a resource group, region, and hosting option in your Azure subscription.
-3. Run the administrator onboarding command below to create the identities and configure GitHub.
-4. The command runs **Deploy Azure demo** with **dry_run checked** to validate configuration first.
-5. Include `--deploy` to continue after validation, create Azure resources, and configure the returned sign-in redirect URI automatically.
-6. Sign in and [check your demo](VALIDATION.md).
+| Component | Configuration |
+| --- | --- |
+| Resource group | `rg-healthclaimsportal-demo` |
+| Web app | Linux App Service, `B1`, **Central US** (`centralus`) |
+| Database | Private PostgreSQL 16, `Standard_D2ads_v5`, `GeneralPurpose`, **East US 2** (`eastus2`) |
+| Registry, runtime identity, logs | East US 2 |
+| Network | One VNet per region, bidirectional peering, private DNS links |
+
+This profile is verified in Zava. Hosting quota varies by subscription, which is why the web app uses a separate region. Check availability in your destination subscription.
 
 ## Automated onboarding
 
-Install Python 3.12+, Azure CLI, and GitHub CLI (`gh`), then sign in with `az login --tenant <TENANT_ID>` and `gh auth login --scopes workflow`. Run from the repository root after these scripts and workflows are on `main` in your destination repository. The account running setup needs permission to create app registrations and service principals, grant tenant consent to this custom API, assign employee app roles, and create resource-group role assignments. Global Administrator plus Azure Owner on the target resource group satisfies these prerequisites; use narrower administrator roles where your tenant permits. GitHub repository administrator access is required. The command cannot grant its operator these privileges.
+### 1. Prepare access
+
+- Install Python 3.12+, Azure CLI, and GitHub CLI (`gh`).
+- Use a destination repo or fork with these workflows on `main`, Actions enabled, and repository administrator access.
+- Have an existing dedicated resource group in the target subscription.
+- Use an Entra administrator who can create apps, grant consent, and assign app roles, plus Azure Owner on the resource group or equivalent permissions. Global Administrator satisfies the Entra requirements.
+
+For another tenant, use a separate repo or fork and a fresh checkout. Each repository's `azure-demo` environment targets one tenant; onboarding stops if existing destination settings conflict.
+
+### 2. Sign in and run setup
+
+From the repository folder, replace the uppercase placeholders. The example uses the working Zava region and size choices; `claimsnewdemo` is an example prefix.
 
 ```powershell
-python scripts/onboard_azure.py --repo OWNER/REPOSITORY --tenant TENANT_ID --subscription SUBSCRIPTION_ID --resource-group RESOURCE_GROUP --prefix UNIQUE_PREFIX --location eastus --hosting containerapps --deploy
+az login --tenant "TENANT_ID"
+gh auth login --scopes workflow
+
+python scripts/onboard_azure.py `
+  --repo "OWNER/REPOSITORY" `
+  --tenant "TENANT_ID" `
+  --subscription "SUBSCRIPTION_ID" `
+  --resource-group "YOUR_RESOURCE_GROUP" `
+  --prefix "claimsnewdemo" `
+  --location eastus2 `
+  --hosting appservice `
+  --appservice-location centralus `
+  --appservice-sku B1 `
+  --database-sku Standard_D2ads_v5 `
+  --database-tier GeneralPurpose `
+  --deploy
 ```
 
-Omit `--deploy` to configure onboarding and run validation only. This still creates identity metadata, an Azure managed identity, and access assignments; it does not provision hosting or PostgreSQL. With `--deploy`, the command creates billable resources after validation passes. Choose `appservice` if that is your preferred hosting option before the first deployment.
-
-If Azure rejects the default database size with `SkuNotAvailable`, select an available size explicitly, for example `--database-sku Standard_B2s --database-tier Burstable`. The command saves these values as GitHub environment variables and reuses them on subsequent runs. Changing database size changes Azure costs. Capability discovery reports what Azure advertises; actual provisioning can still reject a listed size because of capacity or subscription restrictions.
-
-Failed server creation can leave a name reserved after its ARM resource disappears. For an empty environment only, use `--database-server-name <fresh-unique-name>` to deliberately create a new server. The name is saved for later releases. Changing this setting in a populated environment creates a different database; it does not migrate existing claims. Keep the selected name stable once data is stored.
-
-App Service defaults to B1. If your subscription has zero quota for Basic, select a permitted size with `--appservice-sku P0v3`, for example, and require successful ARM validation. The deployment identity retains its resource-group scope. A higher hosting tier changes ongoing costs. Supported sizes are B1-B3, S1-S3, and P0v3-P3v3.
-
-Both onboarding and real GitHub deployments also submit a small, secret-free App Service plan template to ARM **validation only** before provisioning. This catches per-size VM quotas that the regional usage summary can misrepresent. It creates no hosting resources and uses the deployment identity's existing resource-group permissions. If validation reports a VM quota of zero, use a hosting region with available quota or obtain an increase for the selected region. Selecting a larger size is not a substitute for successful native validation.
-
-To retain an existing database while hosting elsewhere, keep `--location` unchanged and add `--appservice-location centralus` (or another region that passes validation). The command saves `AZURE_APPSERVICE_LOCATION`; the templates create a web VNet in that region, bidirectional peering to the database VNet, and a private DNS link. Database access remains private. This uses App Service's supported [VNet integration and global peering](https://learn.microsoft.com/en-us/azure/app-service/overview-vnet-integration) and adds inter-region network charges. Changing the foundation region is not a database migration.
+Use a unique prefix: 3â€“16 lowercase letters and digits, starting with a letter. Here, `--location` selects the foundation/database region; `--appservice-location` selects web hosting. Matching regions use one VNet. Different regions add the peered web VNet and DNS link.
 
 The command:
 
-- Creates or reuses three single-tenant registrations named `<prefix>-claims-api`, `<prefix>-claims-spa`, and `<prefix>-github-deploy`. It configures v2 API tokens, `Claims.Access`, and the three claim roles; grants SPA consent; and assigns Reader, Writer, and Reviewer to the signed-in administrator (or the object ID supplied with `--employee`).
-- Creates `azure-demo` if missing, restricting a new environment to deployments from `main`. Existing protection and approval rules are preserved, so a protected environment may wait for your review in Actions.
-- Runs **Discover Azure OIDC subject** to obtain the exact environment subject, including immutable IDs where applicable. Only selected non-secret claims are logged. It validates the repository IDs, issuer, audience, environment, and branch before creating federation. It does not guess the subject from repository age or change the repository's OIDC settings.
-- Creates the runtime managed identity and gives the deployment principal resource-group Contributor access. Its additional RBAC Administrator delegation is conditioned on **AcrPull for that runtime principal only**, for both assignment creation and deletion. The deployment identity receives no Microsoft Graph application permission or client secret.
-- Writes deployment variables and creates separate random database passwords directly through `gh secret set` stdin. Existing secrets are preserved, and passwords are never stored in onboarding state. Existing approved agent clients and the seed preference are preserved.
-- Runs offline validation, optionally waits for deployment, then uses the local administrator session to add the actual HTTPS portal origin with a trailing `/` to the SPA. Existing redirect URIs are preserved.
+1. Creates or reuses the API, SPA, and deployment registrations. It configures v2 tokens, `Claims.Access`, SPA consent, and Reader/Writer/Reviewer roles for the signed-in administrator. Use `--employee` for another demo user's object ID.
+2. Creates the runtime managed identity and resource-group deployment access. Contributor provisions resources; the extra RBAC delegation permits only AcrPull assignments for that runtime identity.
+3. Creates `azure-demo`, discovers the repo's actual OIDC subject, and configures federation, variables, and two separate random database secrets. GitHub uses OIDC without an Azure client secret or directory administration rights.
+4. Runs offline validation, deploys the infrastructure and container, waits for readiness, then adds the returned HTTPS URLâ€”with its trailing `/`â€”to the SPA redirect URIs.
 
-State and workflow run IDs are saved in ignored `work/onboarding-state.json`; it contains identifiers, not passwords or tokens. Rerun with the same arguments to recover from partial setup. Registrations already referenced by the GitHub environment's client IDs are reused, even when their display names have an earlier infrastructure prefix. A configured client ID missing from the signed-in tenant stops setup instead of silently creating a replacement. Duplicate registration names and conflicting prefix/hosting/client settings stop setup for review. The command does not remove old-tenant identities or resources, alter existing environment protections, rotate existing database passwords, or grant directory administration to GitHub.
+Initial administrator sign-ins and required tenant approvals remain interactive. Omit `--deploy` to configure identities and GitHub and run offline validation without provisioning hosting or PostgreSQL. Existing database secrets, approved clients, redirect URIs, and environment protections are preserved. New environments allow deployments from `main`.
 
-If deployment succeeded but the local session expired before redirect configuration, sign in again and run the same command with `--finalize` instead of `--deploy`. This reads the existing `claims-app` deployment output and completes the redirect without redeploying infrastructure. Normal later releases use **Deploy Azure demo**; the host name and redirect stay stable when the prefix and hosting option are unchanged. Changing the host requires rerunning `--finalize`.
+### 3. Check the result
 
-The initial local administrator sign-ins and any tenant-required approval remain interactive. This is the bootstrap trust boundary: an unconfigured GitHub repository cannot authorize itself to administer your tenant.
+Open the reported URL, sign in, submit a fictitious claim, and reload. Follow [Check your demo](VALIDATION.md) for role and API checks. `/health/ready` checks the database and schema; browser sign-in needs its own test.
 
-Real deployment also checks the subscription's advertised PostgreSQL 16 availability for the selected database size before provisioning. For Container Apps, it detects a pending `AllowBringYourOwnPublicIpAddress` feature approval that can block the environment network. The same check runs locally before `--deploy` changes setup and in GitHub after OIDC login. These checks catch known service restrictions; they do not guarantee regional capacity or replace ARM policy evaluation. Offline `dry_run` remains unchanged. If PostgreSQL reports regional restrictions, request access through Azure support or explicitly choose an available region. A feature requiring Microsoft approval cannot be approved by this script.
+## Later releases and recovery
 
-## Manual alternative
+- **Redeploy:** wait for CI to pass, then run **Actions â†’ Deploy Azure demo â†’ Run workflow** on `main`. Leave `dry_run` checked for offline validation; uncheck it to deploy. Offline validation does not log in to Azure or prove capacity, policy, or sign-in.
+- **Retry setup:** rerun the same onboarding command. Ignored `work/onboarding-state.json` holds identifiers and workflow IDs, never passwords or tokens. Configured registrations are reused even if their display names have an older prefix.
+- **Finish the redirect:** if deployment succeeded but administrator sign-in expired, rerun the same command with `--finalize` instead of `--deploy`. It reads the existing deployment URL without redeploying. Use this after a manual deployment creates a new host too.
 
-The following settings and steps provide the equivalent manual route and help troubleshoot a partial onboarding run.
+Keep the prefix, foundation region, and database name stable once data is stored. In Zava, `AZURE_POSTGRES_SERVER_NAME` is `zavaclaims2-pg-0b2ca611`; routine releases preserve it. Changing a region or server name does not migrate data. The workflow does not delete resources from an earlier hosting choice.
 
-## Prerequisites
-
-- A target Azure public-cloud tenant, subscription, existing resource group and a 3-16 character lowercase alphanumeric prefix starting with a letter.
-- East US (`eastus`) is the default; verify service availability, PostgreSQL SKU capacity and quotas in the selected subscription.
-- The API and SPA registrations from [AUTH.md](AUTH.md).
-- A deployment app/service principal with a GitHub federated identity credential: issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`, and the repository's exact subject ending in `:environment:azure-demo`. New GitHub repositories use the immutable format `repo:OWNER@OWNER_ID/REPOSITORY@REPOSITORY_ID:environment:azure-demo`; older repositories may use `repo:OWNER/REPOSITORY:environment:azure-demo`. Check the actual subject reported by `azure/login` or the repository's OIDC settings. Replace all names/IDs for each fork. See [GitHub's OIDC reference](https://docs.github.com/en/actions/reference/security/oidc).
-- Deployment identity permissions scoped to the resource group: Contributor plus permission to create the runtime AcrPull role assignment (for example Role Based Access Control Administrator). Apply your organization's narrower role-assignment conditions if required. Creating these identities and permissions is an administrator setup step.
-
-Create a GitHub environment named `azure-demo`. If you restrict deployment branches, allow the branch you intend to run; environment approval rules also apply to validation-only runs. Configure required reviewers if desired, and add these variables:
-
-| Variable | Meaning |
+| Azure reports | Next step |
 | --- | --- |
-| AZURE_TENANT_ID | Destination tenant GUID |
-| AZURE_SUBSCRIPTION_ID | Destination subscription GUID |
-| AZURE_DEPLOY_CLIENT_ID | GitHub deployment identity client GUID |
-| AZURE_RESOURCE_GROUP | Existing target resource group |
-| AZURE_LOCATION | `eastus` unless overridden |
-| AZURE_HOSTING | `containerapps` (default) or `appservice`; choose before initial deployment |
-| AZURE_APPSERVICE_SKU | Optional App Service size; default `B1`, or a supported Standard/Premium v3 size with available quota |
-| AZURE_APPSERVICE_LOCATION | Optional web hosting region; defaults to AZURE_LOCATION. A different region creates a peered web VNet and a private DNS link while retaining the database in AZURE_LOCATION. |
-| AZURE_PREFIX | Unique deployment prefix, e.g. `claimsdev` |
-| AZURE_POSTGRES_SKU | Optional database size; default `Standard_B1ms`, e.g. `Standard_B2s` where B1ms is unavailable |
-| AZURE_POSTGRES_TIER | Optional `Burstable` (default), `GeneralPurpose`, or `MemoryOptimized`; must match the size |
-| AZURE_POSTGRES_SERVER_NAME | Optional explicit PostgreSQL server name; keep stable after data is stored |
-| ENTRA_API_CLIENT_ID | API registration client GUID |
-| ENTRA_SPA_CLIENT_ID | Browser registration client GUID |
-| ENTRA_ALLOWED_CLIENT_IDS | SPA and approved agent client GUIDs, comma-separated |
-| SEED_DEMO | Optional `true` (default) or `false`; include eight fictitious example claims |
+| App Service VM quota is zero | Choose an available hosting region with `--appservice-location`, or obtain quota. Basic/Standard/Premium v3 sizes still need native validation. |
+| PostgreSQL `SkuNotAvailable` | Select an available `--database-sku` and matching `--database-tier`. |
+| A failed, empty server's name remains reserved | Use `--database-server-name` for a deliberately new server. Keep populated databases on their existing name. |
+| Container Apps network approval is pending | Resolve the approval or select App Service before deployment. |
 
-Add two environment secrets: `DATABASE_ADMIN_PASSWORD` for migrations/setup and a different `DATABASE_APP_PASSWORD` for the restricted application user. Use strong passwords satisfying Azure requirements; never commit them. Existing deployments adopting this version must add the new application secret before running the workflow. The workflow writes temporary ARM parameter files without printing them and removes them at the end. Keep both passwords stable between deployments unless intentionally rotating them. The startup setup reapplies the runtime password and grants on restart; rotate both values coherently in GitHub and the deployed settings.
+Live preflight checks advertised PostgreSQL availability, known Container Apps restrictions, and native App Service plan validation. It does not automatically choose regions/SKUs or override policy. Advertised capacity can still fail during provisioning. Container Apps remains an alternative through `--hosting containerapps`; the CLI default is Container Apps/East US unless overridden.
 
-## Validate first (no Azure resources created)
+## Manual setup reference
 
-1. Set the environment variables and secret listed above. Use separate API and browser client IDs; include the browser client ID in the allowed-client list. Use canonical GUIDs and a region code such as `eastus`.
-2. Open Actions > **Deploy Azure demo** > Run workflow. Select your intended branch and leave **dry_run checked** (the default).
-3. Read the run summary. Fix any named settings and repeat until the checks pass.
+Use [Entra configuration](AUTH.md) for manual API/SPA setup. Create a deployment principal with resource-group Contributor and permission to assign AcrPull to the runtime identity. Its federated credential uses issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`, and the **actual** subject from the repo's OIDC discovery workflow. Subjects can include immutable repository/owner IDs; do not guess them.
 
-This mode checks configuration, repository structure, application tests, lint, JavaScript syntax, Bicep compilation, and generated parameter contracts. It does not sign in to Azure, deploy resources, or build/push a registry image. GitHub Actions runner usage still applies.
+Set these variables in GitHub's `azure-demo` environment. Onboarding fills them for you:
 
-Parameter generation uses explicitly fictitious infrastructure outputs in `work/validation`, not outputs from an existing deployment. It substitutes dummy passwords and removes generated parameter files afterward. The configured database secrets are checked for presence and separation only; validation-only mode does not prove Azure will accept its password policy.
+| Variable | Meaning / Zava setting |
+| --- | --- |
+| `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | Destination IDs |
+| `AZURE_DEPLOY_CLIENT_ID` | Deployment registration client ID |
+| `AZURE_RESOURCE_GROUP`, `AZURE_PREFIX` | Dedicated group and unique prefix; Zava uses `rg-healthclaimsportal-demo` / `zavaclaims2` |
+| `AZURE_LOCATION` | Foundation/database region; `eastus2` |
+| `AZURE_HOSTING` | `appservice` |
+| `AZURE_APPSERVICE_LOCATION`, `AZURE_APPSERVICE_SKU` | `centralus` / `B1` |
+| `AZURE_POSTGRES_SKU`, `AZURE_POSTGRES_TIER` | `Standard_D2ads_v5` / `GeneralPurpose` |
+| `AZURE_POSTGRES_SERVER_NAME` | Stable server name; optional override for new deployments |
+| `ENTRA_API_CLIENT_ID`, `ENTRA_SPA_CLIENT_ID` | Separate API and browser client IDs |
+| `ENTRA_ALLOWED_CLIENT_IDS` | Browser and approved agent client IDs, comma-separated |
+| `SEED_DEMO` | `true` adds eight fictitious claims |
 
-A passing result **does not verify** registration existence, tenant/subscription membership, federation, permissions, regional capacity, quotas, policies, or sign-in. It is an offline preparation check, not an ARM what-if or a guarantee of deployment success. Application tests here use SQLite; the separate CI workflow also runs PostgreSQL integration and a container readiness check.
-
-## Deploy after validation
-
-1. Confirm application CI is green for the commit being deployed.
-2. Run Actions > **Deploy Azure demo** > Run workflow on the intended branch and **uncheck dry_run**. This authorizes the workflow to create/update billable Azure resources. The same validation checks run before Azure login.
-3. The workflow provisions a VNet, private PostgreSQL Flexible Server/database, private DNS, Container Registry, managed identity and Log Analytics. It creates either a Container Apps environment or a Linux App Service plan (B1 by default, configurable) and web app, then builds the image and deploys the application.
-4. The onboarding command configures the reported SPA redirect URI automatically. For a manual workflow run against a new host, run onboarding with `--finalize`, or configure it as described in AUTH.md.
-5. Sign in with an assigned demo employee; submit a synthetic claim and confirm it survives reload. Verify a reader cannot submit/review, an unassigned user cannot read data, and an approved agent can call the API.
-
-`/health/ready` succeeding verifies database connectivity/schema, not Entra sign-in. The root page, static assets, health endpoints, authentication configuration and API schema are public; claim data endpoints require authorization.
+Add separate strong environment secrets: `DATABASE_ADMIN_PASSWORD` and `DATABASE_APP_PASSWORD`. Keep both stable across releases. Rotate them coherently in GitHub and hosting settings. Deployment uses temporary parameter files without logging their contents and removes them afterward.
 
 ## Operational boundaries
 
-**Registry security/cost tradeoff:** The templates use a Basic registry with a public endpoint and authenticated access; admin login is disabled. This reduces registry cost compared with a Premium registry using private networking, but increases network exposure. If your organization prohibits public registry endpoints, use an approved exception or adapt the infrastructure and build path for private access. The workflow does not create policy exemptions. PostgreSQL uses private networking.
+Use fictitious data only. This demo has one app instance, a single-zone database, seven-day backups, and 30-day log retention. Hosting, PostgreSQL, registry, logging, and cross-region traffic incur charges. Idle resources can still cost money.
 
-Azure charges apply to hosting, PostgreSQL, the registry, and configured logging/network services. App Service Basic, PostgreSQL, and the registry have ongoing costs even when the demo is idle. Container Apps can scale application replicas to zero, but that does not remove the other service costs. Check current prices, regional capacity, quotas, and policies in your target subscription before deployment.
+The container runs as a non-root user. Managed identity pulls images from the authenticated Basic registry; its public endpoint remains enabled and admin login is disabled. PostgreSQL is private and requires TLS. App Service enforces HTTPS/TLS 1.2 and disables FTP/SCM basic publishing credentials.
 
-The container runs as a non-root user. Runtime registry pulls use managed identity. The database has private network access, and the connection requires TLS. Database credentials are Container Apps secrets or encrypted App Service settings. At startup, the administrator connection runs migrations and optional seeding, then provisions `claims_app` with SELECT, INSERT, and UPDATE on the claims table. That role cannot delete claims, change the schema, or manage roles. The server process receives the restricted connection; the bootstrap connection variable is removed before the server is executed. The administrator credential remains configured at the hosting control plane for future startups, so restrict access to hosting settings. This is not a passwordless design. Schema migration runs under a PostgreSQL advisory lock on startup; this demo uses one instance. For larger deployments, move migrations into a controlled release job and review connection pooling, scaling, audit retention and backup recovery. App Service uses a dedicated VNet integration subnet, HTTPS only, TLS 1.2 minimum, and disabled FTP/SCM basic publishing credentials.
-
-The template uses a small single-zone PostgreSQL server, 7-day backups and 30-day log retention. It is a demonstration configuration, not a production healthcare baseline. Tenant-specific policies may require further controls. There is no automated clinical or insurance decision making.
-
-To deploy another environment, reuse the repository with a separate resource group, prefix, identities and GitHub environment configuration. The application requires no changes to business logic. Both Container Apps and App Service templates are included. Select the hosting mode before initial deployment; changing the mode does not automatically delete resources from the previous mode. Provisioning depends on subscription quota and regional availability.
+At startup, a separate administrator connection runs migrations under an advisory lock, optionally seeds data, and configures `claims_app` with SELECT/INSERT/UPDATE access. The API user cannot delete claims, change schema, or manage roles. Bootstrap credentials are removed from the server process but remain in encrypted hosting settings for later startups. Restrict access to those settings. Larger deployments need controlled release migrations, scaling, recovery, and policy review.
 
 ## Logs and demo safeguards
 
-Application events are JSON on stdout with a server-generated request ID. They record request outcome/duration and claim-operation events, omitting bodies, query strings, tokens, review notes, and personal fields. Responses include `X-Request-ID`. Claim history remains in PostgreSQL and is not an immutable external audit store.
+JSON console events include a server-generated request ID; responses expose `X-Request-ID`. Logs omit bodies, queries, tokens, notes, and personal fields. Claim history stays in PostgreSQL and is not an immutable audit store.
 
-Container Apps sends console output to the provisioned Log Analytics workspace. App Service enables container logging and forwards `AppServiceConsoleLogs` to that workspace. Ingestion charges apply. Verify delivery after deployment before relying on it; alerts are not preconfigured. For App Service, use Logs to inspect `AppServiceConsoleLogs`; for Container Apps, inspect `ContainerAppConsoleLogs_CL`.
+App Service forwards `AppServiceConsoleLogs` to Log Analytics; Container Apps uses `ContainerAppConsoleLogs_CL`. Verify ingestion in your environment. Alerts are not preconfigured.
 
-The API limits bodies to 64 KiB and requests to 120/minute per client address per instance by default. Limits are configurable with `MAX_REQUEST_BYTES` and `REQUESTS_PER_MINUTE` in hosting settings. Health probes are exempt. Proxy/NAT users can share a limit; verify trusted-proxy settings for your host. This is a demo safeguard, not a distributed gateway or DDoS protection.
+Defaults are 64 KiB per request body and 120 API requests/minute per client address per instance. Configure `MAX_REQUEST_BYTES` and `REQUESTS_PER_MINUTE` in hosting settings as needed. Health probes are exempt; proxies can share limits. This is a demo safeguard, not distributed abuse protection.
 
-For rollback, redeploy a previous known-good image/commit after checking schema compatibility. No automatic database downgrade is attempted. Remove only this demo's dedicated resource group when retiring it, after preserving any required test data; resource deletion is not performed by these workflows.
-
+For rollback, redeploy a known-good image/commit after checking schema compatibility; database downgrade is not automatic. To retire the demo, preserve any required test data before removing its dedicated resources. Deployment workflows do not perform cleanup.

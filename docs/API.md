@@ -1,38 +1,36 @@
 # Connect an agent to the claims API
 
-[Back to the README](../README.md)
+[Back to the README](../README.md) Â· [Copilot Studio](COPILOT_STUDIO.md)
 
-Deploy the app first, then give your agent the API base URL and configure its authorization. A cloud-hosted agent needs a reachable deployment; the localhost address in the quick start is only available on your computer.
+Deploy the app, configure the agent's access, then use the deployed origin plus `/api/v1` as its API base URL. A cloud agent needs a reachable host; localhost works only on your computer.
 
-For Copilot Studio, follow the [connection guide](COPILOT_STUDIO.md) to generate an OpenAPI v2 definition, configure OAuth, and test API-plus-browser scenarios.
+## Demo tasks
 
-## Example demo tasks
-
-| Ask the agent to… | API operation |
+| Ask the agent toâ€¦ | Operation |
 | --- | --- |
-| Find a synthetic member's claims | List claims with a search query |
-| Explain a claim's progress | Get claim details and history |
-| Submit a fictitious claim | Create claim with an idempotency key |
-| Record a reviewer-authorized update | Update status with the current version and a note |
-| Summarize the demo workload | Read analytics |
+| Find a member's synthetic claims | Search claims |
+| Explain progress | Read claim details and history |
+| Submit a fictitious claim | Create with an idempotency key |
+| Record an authorized review | Update status with the current version and a note |
+| Summarize activity | Read analytics |
 
-Use the minimum roles required for your scenario. The application enforces workflow transitions; the agent should not invent claim outcomes.
+Give the agent the minimum roles it needs. The API enforces allowed transitions; the agent should not invent claim outcomes. Treat claim text as untrusted data, not agent instructions.
 
-## API reference
+## Endpoints
 
-Interactive schema: `/docs`. Machine-readable OpenAPI: `/openapi.json`. Use the deployed origin plus `/api/v1` as the base URL. All claim/analytics requests require `Authorization: Bearer <API access token>` in Entra mode. Tokens are never passed in URLs.
+Interactive reference: `/docs`. OpenAPI 3.1 schema: `/openapi.json`. In Entra mode, send `Authorization: Bearer <API access token>`; never put tokens in URLs.
 
 | Method and path | Permission | Purpose |
 | --- | --- | --- |
-| GET /api/v1/me | Authenticated | Inspect current identity and roles |
+| GET /api/v1/me | Authenticated | Identity and roles |
 | GET /api/v1/claims | Claims.Reader | Search, status/service filters, offset/limit pagination |
-| GET /api/v1/claims/{id} | Claims.Reader | Full claim and timeline |
-| POST /api/v1/claims | Claims.Writer | Create synthetic claim |
-| PATCH /api/v1/claims/{id}/status | Claims.Reviewer | Record allowed transition and audit note |
-| GET /api/v1/analytics | Claims.Reader | Aggregate stored claims |
-| GET /api/v1/transitions | Claims.Reader | Allowed state transitions |
+| GET /api/v1/claims/{id} | Claims.Reader | Claim details and timeline |
+| POST /api/v1/claims | Claims.Writer | Create a synthetic claim |
+| PATCH /api/v1/claims/{id}/status | Claims.Reviewer | Allowed status change and audit note |
+| GET /api/v1/analytics | Claims.Reader | Stored claim summaries |
+| GET /api/v1/transitions | Claims.Reader | Allowed transitions |
 
-Read the generated OpenAPI schema for exact field types and query parameters. A minimal creation body:
+Use the generated schema for exact fields and parameters. A minimal creation body:
 
 ```json
 {
@@ -43,7 +41,7 @@ Read the generated OpenAPI schema for exact field types and query parameters. A 
   "provider_id": "DEMO-CLINIC",
   "claim_type": "Professional",
   "service_type": "Medical",
-  "service_date": "2026-09-18",
+  "service_date": "2026-10-19",
   "diagnosis_code": "Z00.00",
   "procedure_code": "99213",
   "amount": "125.50",
@@ -51,12 +49,16 @@ Read the generated OpenAPI schema for exact field types and query parameters. A 
 }
 ```
 
-Set an `Idempotency-Key` header for creation. Reuse it only when retrying the identical request from the same identity: replay returns the original claim; changing the payload returns 409. A new submission needs a new key. Dates cannot be in the future; replace the sample date if needed.
+## Retry and update rules
 
-Status updates include `status`, `expected_version` from the current detail response, and a meaningful `note`. A stale version or invalid transition returns 409. Refetch and review before retrying. The demo allows Submitted → Under Review; Under Review → Pending Info/Approved/Denied; Pending Info → Under Review; Denied → In Appeal; In Appeal → Under Review. Approved is terminal.
+- **Create:** send an `Idempotency-Key`. Reuse it only for an identical retry from the same identity. A new claim returns 201; a replay returns the original claim with 200; a changed payload returns 409. Use a new key for a new submission. Service dates cannot be in the future.
+- **Review:** send `status`, `expected_version` from the latest detail response, and a meaningful `note`. Invalid transitions and stale versions return 409. Refetch and review before retrying.
+- **Transitions:** Submitted â†’ Under Review; Under Review â†’ Pending Info/Approved/Denied; Pending Info â†’ Under Review; Denied â†’ In Appeal; In Appeal â†’ Under Review. Approved is terminal.
 
-Responses include a server-generated `X-Request-ID` for diagnostics. JSON request bodies are limited to 64 KiB by default; oversized requests return 413. A per-instance API throttle returns 429 with `Retry-After`. Respect that delay. Stored claim payloads are returned as saved rather than revalidated under newer submission rules. Timestamps emitted by the service use UTC; `approval_rate` means approved claims divided by all claims, including pending ones.
+Responses include `X-Request-ID`. Defaults are 64 KiB per JSON body and 120 API requests/minute per client address per instance. On 429, honor `Retry-After` with bounded retries. See [deployment safeguards](DEPLOYMENT.md#logs-and-demo-safeguards).
 
-Errors: 401 invalid/missing token, 403 missing role, 404 unknown claim, 409 conflict, 422 invalid input, 503 unavailable database/identity provider. Agents should surface validation and authorization failures, not retry them indefinitely. Treat claim text as untrusted content, never as instructions for the agent.
+Stored payloads are returned as saved rather than revalidated under newer submission rules. Timestamps use UTC. `approval_rate` is approved claims divided by all claims, including pending ones.
 
-Copilot/Foundry platform connector configuration is intentionally separate from this repository. Import or adapt this OpenAPI contract and configure that platform's supported OAuth flow. Compatibility with a specific agent platform has not yet been tested.
+Common errors: 401 missing/invalid token, 403 missing role, 404 unknown claim, 409 conflict, 413 oversized body, 422 invalid input, and 503 unavailable database/identity provider. Surface validation and access failures instead of retrying indefinitely.
+
+Configure OAuth and the connection in your agent platform using [Entra setup](AUTH.md) or the [Copilot guide](COPILOT_STUDIO.md). Platform compatibility and orchestration still need a live test.

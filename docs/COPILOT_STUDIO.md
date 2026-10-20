@@ -1,65 +1,59 @@
 # Connect Copilot Studio
 
-[API reference](API.md) · [Deploy your demo](DEPLOYMENT.md)
+[API reference](API.md) Â· [Deploy your demo](DEPLOYMENT.md)
 
-Configure the API connection and browser automation separately. Azure deployment provides the app; it does not create a Copilot Studio agent or connection.
+Configure the API connection and browser connection separately. Azure onboarding deploys the app; it does not create a Copilot Studio agent or connection.
 
 ## 1. Prepare access
 
-1. Deploy the app and complete [Check your demo](VALIDATION.md).
-2. Keep the API registration configured for v2 access tokens as described in [Entra setup](AUTH.md).
-3. Create a separate confidential client registration for the connector. Give it delegated permission to the API's `Claims.Access` scope and obtain the required consent.
-4. Add that connector client ID to `ENTRA_ALLOWED_CLIENT_IDS`, retaining the browser client ID, and redeploy the app configuration.
-5. Assign the demo user the API roles needed for the scenario. Reader reads; Writer submits; Reviewer changes status. A full workflow normally needs all three independent roles.
+1. Deploy the app and complete the [demo checks](VALIDATION.md).
+2. Create a separate confidential client registration for the connector. Grant delegated `Claims.Access` permission to the API and obtain tenant consent.
+3. Add its client ID to `ENTRA_ALLOWED_CLIENT_IDS`, retain the browser ID, and redeploy the app configuration.
+4. Assign the demo user the required API roles: Reader reads, Writer submits, Reviewer changes status. A full workflow needs all three.
 
-The connector client ID differs from the API ID and browser SPA ID. Register the Web callback URI supplied by Power Platform on the connector registration. Enter its client secret only in the connector's secure authentication settings, never in a definition file or agent instructions.
+Use the connector's own client ID, not the API or SPA ID. Register the Web callback URI supplied by Power Platform. Enter its secret only in the platform's secure connection settings, never in source or agent instructions. Keep the API on [v2 access tokens](AUTH.md).
 
-## 2. Generate your definition
+## 2. Generate the API definition
 
-From the repository folder, after `uv sync --frozen`, run:
+After `uv sync --frozen`, run from the repository folder with your hostname and IDs in place of the uppercase placeholders:
 
 ```powershell
-uv run python -m scripts.export_copilot --host "<your-portal-hostname>" --tenant-id "<your-tenant-guid>" --api-client-id "<your-api-registration-client-guid>"
+uv run python -m scripts.export_copilot --host "YOUR_PORTAL_HOSTNAME" --tenant-id "TENANT_ID" --api-client-id "API_CLIENT_ID"
 ```
 
-Use just the hostname, such as `your-app.azurewebsites.net`, without `https://` or a path. Output goes to `work/copilot-studio.swagger.json`, which Git ignores. It contains endpoint and public identity identifiers, but no credentials.
+Use a hostname such as `your-app.azurewebsites.net`, without `https://` or a path. The output is ignored `work/copilot-studio.swagger.json`. It contains endpoint/identity identifiers, no credentials. The checked-in [template](../integrations/copilot-studio.swagger.json) uses reserved examples; generate a destination-specific file before import.
 
-The checked-in [template](../integrations/copilot-studio.swagger.json) uses reserved examples. Generate your own file before importing it. The exporter derives all seven operations and their models from the live application schema. CI checks Swagger 2.0 structure, operation/parameter consistency, real API response shapes, and template freshness. Unsupported schema changes fail rather than silently losing fields.
-
-The standard `/openapi.json` remains OpenAPI 3.1. The export uses v2 representations: decimal input is text for precision; nullable fields use `x-nullable`. Runtime validation remains authoritative for dates, amounts, transitions, and permissions.
+The exporter derives seven operations and models from the application schema. CI checks structure, parameters, response shapes, and template freshness. Unsupported conversions fail. The export is Swagger 2.0; `/openapi.json` remains OpenAPI 3.1. Decimal input uses text for precision, nullable fields use `x-nullable`, and runtime validation remains authoritative.
 
 ## 3. Import and authenticate
 
-Use **Add tool > REST API** in Copilot Studio where available, or import the v2 definition into a Power Platform custom connector and add its actions to the agent. Select the operations your scenario needs.
+In Copilot Studio, use **Tools â†’ Add tool â†’ New tool â†’ REST API** where available, or import the v2 file into a Power Platform custom connector. Select the operations your scenario needs. Follow Microsoft's [REST API tool guide](https://learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-rest-api) for the current import screens.
 
-Configure OAuth 2.0 using the connector registration from step 1:
+Configure OAuth 2.0 with the connector registration:
 
 | Setting | Value |
 | --- | --- |
-| Client ID | Connector registration client ID |
-| Client secret | Enter securely in platform connection settings |
-| Authorization URL | `https://login.microsoftonline.com/<tenant-guid>/oauth2/v2.0/authorize` |
-| Token / refresh URL | `https://login.microsoftonline.com/<tenant-guid>/oauth2/v2.0/token` |
-| Scope | `api://<API-client-guid>/Claims.Access offline_access` |
+| Client ID | Connector client ID |
+| Client secret | Enter securely in connection settings |
+| Authorization URL | `https://login.microsoftonline.com/<TENANT_ID>/oauth2/v2.0/authorize` |
+| Token / refresh URL | `https://login.microsoftonline.com/<TENANT_ID>/oauth2/v2.0/token` |
+| Scope | `api://<API_CLIENT_ID>/Claims.Access offline_access` |
 
-The definition includes endpoints and scopes. Follow the connection UI for credential entry and callback configuration. The connection needs a token for this API, rather than a token issued for Microsoft Graph or another resource.
+The connection needs a token for this API. The supplied definition describes delegated authorization-code OAuth; OBO and application-only connections require separate configuration. See Microsoft's [OBO guide](https://learn.microsoft.com/en-us/microsoft-copilot-studio/advanced-custom-connector-on-behalf-of) if your scenario needs it.
 
-See Microsoft's [REST API tool guide](https://learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-rest-api) and [Entra custom connector/OBO guide](https://learn.microsoft.com/en-us/microsoft-copilot-studio/advanced-custom-connector-on-behalf-of). Availability and UI vary. The supplied file describes delegated authorization-code OAuth; it does not preconfigure OBO or an application-only connection.
+## 4. Test one API workflow
 
-## 4. Prove one API workflow
+Using the `/api/v1` base path:
 
-1. Call `/me` through the connection and confirm the expected API roles.
-2. List claims and get one claim's details. Confirm nested fields such as `data.patient_id`, `data.diagnosis_code`, and `data.provider_id` are available for mapping.
-3. Create one fictitious claim. Bind a GUID to `Idempotency-Key` and retain it for retries of that submission; do not generate a new key for each retry.
-4. Read the returned claim and allowed transitions. Submit a reviewer update using its current `version` as `expected_version`.
-5. Confirm the status and history. A replayed create returns 200; a new create returns 201. On 409, inspect/refetch before retrying. On 429, honor `Retry-After` with bounded retries.
+1. Call `/me`; confirm the expected roles. List claims and read one detail response, including its nested `data` fields.
+2. Create a fictitious claim with a GUID `Idempotency-Key`. Retain it for retries of that submission.
+3. Read the returned claim and allowed transitions. Update status with its current `version` as `expected_version` and a review note.
+4. Confirm history. An identical create replay returns 200, a new create returns 201. Refetch on 409; honor `Retry-After` on 429 with bounded retries.
 
-Defaults are 120 API requests/minute per client address per instance and 64 KiB per request body. Shared proxies/concurrent agents can share a limit. Tune hosting settings after measuring your demo workload; see [deployment safeguards](DEPLOYMENT.md#logs-and-demo-safeguards).
+Shared proxies and concurrent agents can share the API's per-address rate limit. Check the [deployment safeguards](DEPLOYMENT.md#logs-and-demo-safeguards) before increasing traffic.
 
 ## 5. Add browser interaction
 
-For an API-plus-UI demo, create or update a claim through the API, then use [computer use](https://learn.microsoft.com/en-us/microsoft-copilot-studio/computer-use) to open Claims Tracker, search for the returned claim ID, and verify the result. Configure the machine/browser connection and normal Entra website sign-in separately; the API connection does not automatically sign in the browser.
+For an API-plus-UI demo, create or update through the API, then use [computer use](https://learn.microsoft.com/en-us/microsoft-copilot-studio/computer-use) to find that claim in Claims Tracker. Configure the machine/browser connection and normal Entra website sign-in separately. An API connection does not sign in the browser.
 
-The portal's screens and controls remain available. Treat claim notes and app content as untrusted data, separate from agent instructions.
-
-CI validates schemas and API contracts. Import, consent, token issuance, orchestration, website sign-in, and computer use still require verification in your chosen Copilot Studio environment.
+Treat claim notes and page content as untrusted data. CI validates API contracts; import, consent, token issuance, orchestration, and computer use still need live verification in your Copilot Studio environment.

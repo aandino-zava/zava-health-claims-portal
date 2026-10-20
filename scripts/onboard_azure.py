@@ -14,7 +14,7 @@ import tempfile
 import time
 from pathlib import Path
 from urllib.parse import quote, urlsplit
-from uuid import NAMESPACE_URL, uuid4, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 GRAPH = "https://graph.microsoft.com/v1.0/"
 CONTRIBUTOR = "b24988ac-6180-42a0-ab88-20f7382dd24c"
@@ -77,10 +77,18 @@ def all_graph(path):
     return rows
 
 
-def application(name):
-    matches = all_graph("applications?$filter=" + quote("displayName eq '" + name + "'"))
+def application(name, client_id=None):
+    if client_id:
+        try:
+            client_id = str(UUID(client_id))
+        except ValueError:
+            raise RuntimeError("Configured registration client ID is invalid.") from None
+    expression = f"appId eq '{client_id}'" if client_id else f"displayName eq '{name}'"
+    matches = all_graph("applications?$filter=" + quote(expression))
     if len(matches) > 1:
         raise RuntimeError(f"Multiple registrations named {name}; resolve the ambiguity first.")
+    if client_id and not matches:
+        raise RuntimeError("Configured registration was not found in the signed-in tenant.")
     return matches[0] if matches else graph("applications", "POST", {
         "displayName": name, "signInAudience": "AzureADMyOrg",
     })
@@ -120,13 +128,14 @@ def api_manifest(app):
             "api": api, "appRoles": roles}, scope
 
 
-def ensure_identities(prefix, employee_id):
-    api = application(f"{prefix}-claims-api")
+def ensure_identities(prefix, employee_id, configured=None):
+    configured = configured or {}
+    api = application(f"{prefix}-claims-api", configured.get("ENTRA_API_CLIENT_ID"))
     manifest, scope = api_manifest(api)
     graph("applications/" + api["id"], "PATCH", manifest)
     api = graph("applications/" + api["id"])
     api_sp = service_principal(api["appId"])
-    spa = application(f"{prefix}-claims-spa")
+    spa = application(f"{prefix}-claims-spa", configured.get("ENTRA_SPA_CLIENT_ID"))
     access = list(spa.get("requiredResourceAccess", []))
     resource = next((entry for entry in access if entry["resourceAppId"] == api["appId"]), None)
     if resource is None:
@@ -154,7 +163,7 @@ def ensure_identities(prefix, employee_id):
                 graph(f"users/{employee_id}/appRoleAssignments", "POST", {
                     "principalId": employee_id, "resourceId": api_sp["id"], "appRoleId": role["id"],
                 })
-    deploy = application(f"{prefix}-github-deploy")
+    deploy = application(f"{prefix}-github-deploy", configured.get("AZURE_DEPLOY_CLIENT_ID"))
     return api, spa, deploy, service_principal(deploy["appId"])
 
 
@@ -342,7 +351,7 @@ def main():
     subject = discover_subject(args.repo, info)
     employee = args.employee or graph("me?$select=id")["id"]
     print("Configuring Entra registrations, consent, and demo employee roles.", flush=True)
-    api, spa, deploy, deploy_sp = ensure_identities(args.prefix, employee)
+    api, spa, deploy, deploy_sp = ensure_identities(args.prefix, employee, current)
     runtime = run("az", "identity", "create", "-g", args.resource_group, "-n", args.prefix + "-runtime",
                   "--location", args.location, "--output", "json")
     ensure_azure_role(deploy_sp["id"], CONTRIBUTOR, scope)

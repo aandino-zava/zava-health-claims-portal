@@ -1,6 +1,6 @@
 # How the application fits together
 
-[Back to the README](../README.md) Â· [Beginner's guide](BEGINNERS_GUIDE.md)
+[Back to the README](../README.md) · [Beginner's guide](BEGINNERS_GUIDE.md)
 
 ## Application flow
 

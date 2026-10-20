@@ -50,14 +50,14 @@ python scripts/onboard_azure.py `
   --deploy
 ```
 
-Use a unique prefix: 3â€“16 lowercase letters and digits, starting with a letter. Here, `--location` selects the foundation/database region; `--appservice-location` selects web hosting. Matching regions use one VNet. Different regions add the peered web VNet and DNS link.
+Use a unique prefix: 3–16 lowercase letters and digits, starting with a letter. Here, `--location` selects the foundation/database region; `--appservice-location` selects web hosting. Matching regions use one VNet. Different regions add the peered web VNet and DNS link.
 
 The command:
 
 1. Creates or reuses the API, SPA, and deployment registrations. It configures v2 tokens, `Claims.Access`, SPA consent, and Reader/Writer/Reviewer roles for the signed-in administrator. Use `--employee` for another demo user's object ID.
 2. Creates the runtime managed identity and resource-group deployment access. Contributor provisions resources; the extra RBAC delegation permits only AcrPull assignments for that runtime identity.
 3. Creates `azure-demo`, discovers the repo's actual OIDC subject, and configures federation, variables, and two separate random database secrets. GitHub uses OIDC without an Azure client secret or directory administration rights.
-4. Runs offline validation, deploys the infrastructure and container, waits for readiness, then adds the returned HTTPS URLâ€”with its trailing `/`â€”to the SPA redirect URIs.
+4. Runs offline validation, deploys the infrastructure and container, waits for readiness, then adds the returned HTTPS URL—with its trailing `/`—to the SPA redirect URIs.
 
 Initial administrator sign-ins and required tenant approvals remain interactive. Omit `--deploy` to configure identities and GitHub and run offline validation without provisioning hosting or PostgreSQL. Existing database secrets, approved clients, redirect URIs, and environment protections are preserved. New environments allow deployments from `main`.
 
@@ -67,7 +67,7 @@ Open the reported URL, sign in, submit a fictitious claim, and reload. Follow [C
 
 ## Later releases and recovery
 
-- **Redeploy:** wait for CI to pass, then run **Actions â†’ Deploy Azure demo â†’ Run workflow** on `main`. Leave `dry_run` checked for offline validation; uncheck it to deploy. Offline validation does not log in to Azure or prove capacity, policy, or sign-in.
+- **Redeploy:** wait for CI to pass, then run **Actions → Deploy Azure demo → Run workflow** on `main`. Leave `dry_run` checked for offline validation; uncheck it to deploy. Offline validation does not log in to Azure or prove capacity, policy, or sign-in.
 - **Retry setup:** rerun the same onboarding command. Ignored `work/onboarding-state.json` holds identifiers and workflow IDs, never passwords or tokens. Configured registrations are reused even if their display names have an older prefix.
 - **Finish the redirect:** if deployment succeeded but administrator sign-in expired, rerun the same command with `--finalize` instead of `--deploy`. It reads the existing deployment URL without redeploying. Use this after a manual deployment creates a new host too.
 

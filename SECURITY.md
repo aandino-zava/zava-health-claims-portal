@@ -2,7 +2,7 @@
 
 Use fictitious data only. Authorized readers share the workspace; claims are not isolated by patient or owner. This is a demo, not a production healthcare baseline.
 
-Report suspected vulnerabilities privately to the repository owner. Use **Security â†’ Report a vulnerability** if enabled; otherwise contact the owner privately. Keep credentials and patient information out of issues.
+Report suspected vulnerabilities privately to the repository owner. Use **Security → Report a vulnerability** if enabled; otherwise contact the owner privately. Keep credentials and patient information out of issues.
 
 `main` is the supported branch. Review dependency updates and run CI before merging. Database, identity, and infrastructure changes also need checks in the target environment.
 

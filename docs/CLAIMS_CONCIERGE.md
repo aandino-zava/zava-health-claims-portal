@@ -16,7 +16,7 @@ An appeal saying that attachments exist is not evidence that they exist. Claim b
 
 Use App Service with Always On and the existing portal runtime managed identity. This polling connection is not configured for scale-to-zero Container Apps. No callback secret or public write endpoint is added.
 
-In the intended Dataverse environment, create an application user for that managed identity and assign the dedicated **Zava Claims Portal Worker** role from the concierge solution. It reads policy, evidence, evaluations, native Approvals and Approval responses, and updates evaluation completion. It cannot change policy, evidence or Approval records. Keep the agent audience and Medical Director configuration restricted.
+In the intended Dataverse environment, create an application user for that managed identity and assign the dedicated **Zava Claims Portal Worker** role from the concierge solution. It reads policy, evidence, evaluations, native Approvals and Approval responses, and updates evaluation completion. The SDK also requires read-only table, column and relationship definition access, included in that role. It cannot change policy, evidence or Approval records. Keep the agent audience and Medical Director configuration restricted.
 
 Set the portal deployment environment's `CONCIERGE_CONFIG_JSON` variable with destination-specific values:
 

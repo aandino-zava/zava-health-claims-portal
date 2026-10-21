@@ -37,6 +37,8 @@ An authorized evidence maintainer must put a `portalBinding` object in the prote
 
 The review request must explicitly explain that approval or denial can update that fictional portal record. Approval requires verified eligibility. Denial still requires an authenticated human decision. An information request or escalation does not change portal status through this connection.
 
+After a portal status change, have the authorized evidence maintainer refresh the protected binding before another evaluation. The original snapshot becomes stale, so a repeated approval cannot silently apply to the newer claim version.
+
 ## Verify and operate
 
 Complete a genuine Medical Director Approval, then verify the portal status and timeline, persisted version, operation receipt and Dataverse `PortalConfirmed` result. Do not treat a successful flow or `PortalUpdatePending` as proof of a portal update.

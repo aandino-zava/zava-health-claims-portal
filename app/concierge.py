@@ -155,7 +155,9 @@ class ConciergeWorker:
             require(len(policies) == len(saved) == 3
                     and [business_fields(r) for r in policies] == [business_fields(r) for r in saved], "PolicyChanged")
             require(all(instant(r["cr_effective_from"]).date() <= instant(claim["serviceDate"]+"T00:00:00Z").date()
-                        < instant(r["cr_effective_to"]).date() for r in policies), "PolicyOutsideServiceDate")
+                        and (r.get("cr_effective_to") is None
+                             or instant(claim["serviceDate"]+"T00:00:00Z").date()
+                             < instant(r["cr_effective_to"]).date()) for r in policies), "PolicyOutsideServiceDate")
         return decision, binding
 
     def apply(self, evaluation):

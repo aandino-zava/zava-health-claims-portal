@@ -193,3 +193,12 @@ def test_managed_identity_gateway_initializes_without_network_or_credentials():
         concierge_dataverse_url="https://example.crm.dynamics.com",
         concierge_identity_client_id="11111111-1111-4111-8111-111111111111"))
     gateway.client.close()
+
+
+def test_active_policy_can_have_no_end_date(connected):
+    worker, item, gateway, *_ = connected
+    gateway.current_policies = copy.deepcopy(gateway.current_policies)
+    for rule in gateway.current_policies:
+        rule["cr_effective_to"] = None
+    item["cr_policy_snapshot_json"] = json.dumps(gateway.current_policies)
+    assert worker.apply(item)["status"] == "Approved"

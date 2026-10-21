@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.concierge import ConciergeWorker, RejectedDecision, portal_snapshot
+from app.concierge import ConciergeWorker, DataverseGateway, RejectedDecision, portal_snapshot
 from app.database import Claim
 from tests.test_api import payload, setup, submit  # noqa: F401
 
@@ -186,3 +186,10 @@ def test_downstream_failure_preserves_pending_decision(connected):
     with pytest.raises(TimeoutError):
         worker.run_once()
     assert gateway.acknowledgements == [] and item["cr_state"] == "PortalUpdatePending"
+
+
+def test_managed_identity_gateway_initializes_without_network_or_credentials():
+    gateway = DataverseGateway(SimpleNamespace(
+        concierge_dataverse_url="https://example.crm.dynamics.com",
+        concierge_identity_client_id="11111111-1111-4111-8111-111111111111"))
+    gateway.client.close()

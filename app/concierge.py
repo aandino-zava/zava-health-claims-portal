@@ -56,7 +56,7 @@ class DataverseGateway:
         self.client = DataverseClient(
             base_url=settings.concierge_dataverse_url,
             credential=ManagedIdentityCredential(client_id=settings.concierge_identity_client_id),
-            context=OperationContext(user_agent_context="zava-claims-portal/concierge"))
+            context=OperationContext(user_agent_context="app=zava-claims-portal/1.0"))
 
     def pending(self):
         return [dict(r) for r in self.client.records.list("cr_claim_evaluation",
@@ -218,7 +218,8 @@ async def run_worker(settings, sessions, stop):
     while not stop.is_set():
         try:
             if worker is None:
-                worker = ConciergeWorker(settings, sessions, DataverseGateway(settings))
+                gateway = await asyncio.to_thread(DataverseGateway, settings)
+                worker = ConciergeWorker(settings, sessions, gateway)
             await asyncio.to_thread(worker.run_once)
         except Exception as exc:
             # Keep the durable outbox entry for reconciliation; never log payloads.

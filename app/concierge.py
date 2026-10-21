@@ -37,8 +37,9 @@ def same(value, expected):
 
 
 def business_fields(row):
-    # Connector OData annotations differ from SDK annotations; compare the facts.
-    return {k: v for k, v in row.items() if k.startswith("cr_") and "@" not in k}
+    # Dataverse connectors can omit null properties while the SDK returns them.
+    # Preserve every non-null business value, including false and zero.
+    return {k: v for k, v in row.items() if k.startswith("cr_") and "@" not in k and v is not None}
 
 
 def portal_snapshot(row):

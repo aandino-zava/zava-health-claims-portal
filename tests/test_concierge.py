@@ -202,3 +202,26 @@ def test_active_policy_can_have_no_end_date(connected):
         rule["cr_effective_to"] = None
     item["cr_policy_snapshot_json"] = json.dumps(gateway.current_policies)
     assert worker.apply(item)["status"] == "Approved"
+
+
+def test_sdk_null_policy_fields_match_connector_omissions(connected):
+    worker, item, gateway, *_ = connected
+    saved = json.loads(item["cr_policy_snapshot_json"])
+    gateway.current_policies = copy.deepcopy(saved)
+    for rule in saved:
+        rule.pop("cr_effective_to")
+    item["cr_policy_snapshot_json"] = json.dumps(saved)
+    for rule in gateway.current_policies:
+        rule["cr_effective_to"] = None
+        rule["cr_min_pt_sessions_week"] = None
+    assert worker.apply(item)["status"] == "Approved"
+
+
+@pytest.mark.parametrize("new_value", [0, False, 2])
+def test_omitted_policy_field_cannot_hide_a_new_business_value(connected, new_value):
+    worker, item, gateway, client, claim = connected
+    gateway.current_policies = copy.deepcopy(gateway.current_policies)
+    gateway.current_policies[0]["cr_min_pt_sessions_week"] = new_value
+    with pytest.raises(RejectedDecision, match="PolicyChanged"):
+        worker.apply(item)
+    assert client.get(f"/api/v1/claims/{claim}").json()["status"] == "Under Review"

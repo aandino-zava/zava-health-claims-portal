@@ -47,6 +47,7 @@ jobs:
       DATABASE_ADMIN_PASSWORD: ${{ secrets.DATABASE_ADMIN_PASSWORD }}
       DATABASE_APP_PASSWORD: ${{ secrets.DATABASE_APP_PASSWORD }}
       SEED_DEMO: ${{ vars.SEED_DEMO || 'true' }}
+      CONCIERGE_CONFIG_JSON: ${{ vars.CONCIERGE_CONFIG_JSON }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
@@ -109,6 +110,7 @@ jobs:
       DATABASE_ADMIN_PASSWORD: ${{ secrets.DATABASE_ADMIN_PASSWORD }}
       DATABASE_APP_PASSWORD: ${{ secrets.DATABASE_APP_PASSWORD }}
       SEED_DEMO: ${{ vars.SEED_DEMO || 'true' }}
+      CONCIERGE_CONFIG_JSON: ${{ vars.CONCIERGE_CONFIG_JSON }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Recheck deployment configuration

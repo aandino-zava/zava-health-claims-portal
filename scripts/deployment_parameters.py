@@ -29,6 +29,7 @@ def parameters(env, outputs=None):
         for key in keys:
             params[key] = outputs[key]["value"]
         if hosting == "appservice":
+            params["conciergeConfig"] = json.loads(env.get("CONCIERGE_CONFIG_JSON") or "{}")
             params["appServiceSku"] = env.get("AZURE_APPSERVICE_SKU", "B1")
             params["location"] = env.get("AZURE_APPSERVICE_LOCATION") or params["location"]
             if env.get("AZURE_WEBAPP_NAME"):

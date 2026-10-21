@@ -17,9 +17,26 @@ class Settings(BaseSettings):
     entra_authority_host: str = "https://login.microsoftonline.com"
     max_request_bytes: int = Field(default=65536, ge=1024, le=1048576)
     requests_per_minute: int = Field(default=120, ge=1, le=10000)
+    concierge_enabled: bool = False
+    concierge_dataverse_url: str = ""
+    concierge_identity_client_id: str = ""
+    concierge_reviewer_object_id: str = ""
+    concierge_reviewer_user_id: str = ""
+    concierge_allowed_claim_ids: str = ""
+    concierge_poll_seconds: int = Field(default=20, ge=10, le=300)
 
     @model_validator(mode="after")
     def secure_defaults(self):
+        if self.concierge_enabled:
+            import re
+            if not re.fullmatch(r"https://[a-z0-9-]+\.crm[0-9]*\.dynamics\.com/?", self.concierge_dataverse_url):
+                raise ValueError("Concierge requires an HTTPS Dataverse environment")
+            for value in (self.concierge_identity_client_id, self.concierge_reviewer_object_id,
+                          self.concierge_reviewer_user_id):
+                UUID(value)
+            allowed = self.concierge_allowed_claim_ids.split(",")
+            if not allowed or any(not re.fullmatch(r"CLM-\d{4}-[A-F0-9]{16}", v.strip()) for v in allowed):
+                raise ValueError("Concierge requires explicitly allowed fictional portal claim IDs")
         if self.auth_mode == "development" and self.environment not in {"development", "test"}:
             raise ValueError("Development authentication is forbidden outside development/test")
         if self.auth_mode == "entra":

@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from time import monotonic
@@ -43,7 +44,14 @@ def create_app(settings=None):
     @asynccontextmanager
     async def lifespan(app):
         event("synthetic_demo_started")
+        stop, task = asyncio.Event(), None
+        if settings.concierge_enabled:
+            from app.concierge import run_worker
+            task = asyncio.create_task(run_worker(settings, sessions, stop))
         yield
+        stop.set()
+        if task:
+            await task
         engine.dispose()
 
     app = FastAPI(

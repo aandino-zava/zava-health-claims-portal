@@ -43,6 +43,8 @@ FastAPI handles authorization, input checks, and claim rules. HTML, JavaScript, 
 
 The repository provides the app and API. Configure and test your Copilot Studio or Foundry agent separately.
 
+The optional [Medical Claims Concierge connection](docs/CLAIMS_CONCIERGE.md) applies verified human decisions to explicitly allowed fictional claims through a protected Dataverse queue.
+
 ## Scope and maintenance
 
 **Use fictitious data only.** This is a shared demo workspace. It does not perform insurance adjudication, eligibility checks, payments, or clinical coding verification.

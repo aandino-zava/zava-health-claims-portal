@@ -19,6 +19,8 @@ param allowedClientIds string
 param webSubnetId string
 param logsWorkspaceId string
 param seedDemo bool = true
+@description('Optional fictional-claims concierge connection. Supply destination identifiers, never credentials.')
+param conciergeConfig object = {}
 @allowed(['B1', 'B2', 'B3', 'S1', 'S2', 'S3', 'P0v3', 'P1v3', 'P2v3', 'P3v3'])
 param appServiceSku string = 'B1'
 
@@ -66,6 +68,12 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'ENTRA_SPA_CLIENT_ID', value: spaClientId }
         { name: 'ENTRA_ALLOWED_CLIENT_IDS', value: allowedClientIds }
         { name: 'SEED_DEMO', value: string(seedDemo) }
+        { name: 'CONCIERGE_ENABLED', value: string(conciergeConfig.?enabled ?? false) }
+        { name: 'CONCIERGE_DATAVERSE_URL', value: conciergeConfig.?dataverseUrl ?? '' }
+        { name: 'CONCIERGE_IDENTITY_CLIENT_ID', value: conciergeConfig.?identityClientId ?? '' }
+        { name: 'CONCIERGE_REVIEWER_OBJECT_ID', value: conciergeConfig.?reviewerObjectId ?? '' }
+        { name: 'CONCIERGE_REVIEWER_USER_ID', value: conciergeConfig.?reviewerUserId ?? '' }
+        { name: 'CONCIERGE_ALLOWED_CLAIM_IDS', value: conciergeConfig.?allowedClaimIds ?? '' }
       ]
     }
   }

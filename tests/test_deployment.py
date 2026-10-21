@@ -121,7 +121,7 @@ def test_live_parameters_keep_contract(hosting):
     actual = parameters(env, outputs)["parameters"]
     expected = {"prefix", "location", "databasePassword", "identityId", "databaseHost", "image",
                 "tenantId", "apiClientId", "spaClientId", "allowedClientIds", "appDatabasePassword", "seedDemo"}
-    expected |= {"webSubnetId", "logsWorkspaceId", "appServiceSku"} if hosting == "appservice" else {"environmentId", "registryServer"}
+    expected |= {"webSubnetId", "logsWorkspaceId", "appServiceSku", "conciergeConfig"} if hosting == "appservice" else {"environmentId", "registryServer"}
     assert set(actual) == expected
     assert actual["databasePassword"]["value"] == env["DATABASE_ADMIN_PASSWORD"]
     assert actual["image"]["value"] == "validationonly.azurecr.io/health-claims-portal:test-commit"
